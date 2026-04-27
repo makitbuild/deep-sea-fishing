@@ -26,12 +26,14 @@
   }
 
   *{margin:0;padding:0;box-sizing:border-box;}
-  html,body{height:100%;overflow:hidden;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
   body{
     font-family:'Shippori Mincho',serif;
     background:#0a0a0a;
     color:var(--ink);
     user-select:none;
+    -webkit-user-select:none;
+    -webkit-touch-callout:none;
   }
 
   /* =============== LAYOUT =============== */
@@ -52,6 +54,7 @@
     position:relative;overflow:hidden;
     background:#000;
     cursor:pointer;
+    touch-action:manipulation;
   }
   #scene{
     position:absolute;left:0;right:0;top:0;
@@ -363,6 +366,7 @@
     position:relative;
     text-transform:uppercase;
     transition:all .15s;
+    touch-action:manipulation;
   }
   .btn::before{
     content:"";position:absolute;inset:3px;
@@ -1849,6 +1853,12 @@ $ocean.addEventListener('click',(e)=>{
   if(e.target.closest('#depth-hud')) return;
   $actionBtn.click();
 });
+
+// Suppress iOS Safari pinch-zoom and double-tap zoom that interfere with rapid tapping
+['gesturestart','gesturechange','gestureend'].forEach(ev=>{
+  document.addEventListener(ev, e => e.preventDefault(), {passive:false});
+});
+document.addEventListener('dblclick', e => e.preventDefault(), {passive:false});
 
 // catch popup
 $('cp-close').addEventListener('click',()=>{
