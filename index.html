@@ -1,0 +1,2044 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>深海つり — マリアナ海溝の航海</title>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;700;800&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#e8dcc4;
+    --paper-dark:#c9b896;
+    --ink:#2a1f14;
+    --ink-soft:#4a3828;
+    --gold:#c89b3c;
+    --gold-bright:#e4b857;
+    --rust:#8b3a1f;
+    --abyss-0:#6eb1d4;
+    --abyss-1:#3673a1;
+    --abyss-2:#143d6b;
+    --abyss-3:#071e3d;
+    --abyss-4:#01040c;
+    --abyss-5:#000000;
+    --glow:#7ae3ff;
+    --bio-green:#a9ff7e;
+    --bio-purple:#d286ff;
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;overflow:hidden;-webkit-tap-highlight-color:transparent;}
+  body{
+    font-family:'Shippori Mincho',serif;
+    background:#0a0a0a;
+    color:var(--ink);
+    user-select:none;
+  }
+
+  /* =============== LAYOUT =============== */
+  #game{
+    position:relative;
+    width:100vw;height:100vh;
+    display:grid;
+    grid-template-columns:minmax(280px,1fr) minmax(320px,420px);
+    overflow:hidden;
+  }
+  @media (max-width:720px){
+    #game{grid-template-columns:1fr;grid-template-rows:1fr auto;}
+    #panel{max-height:42vh;}
+  }
+
+  /* =============== OCEAN VIEW =============== */
+  #ocean{
+    position:relative;overflow:hidden;
+    background:#000;
+    cursor:pointer;
+  }
+  #scene{
+    position:absolute;left:0;right:0;top:0;
+    will-change:transform;
+    transform:translateY(0);
+  }
+  .zone{
+    position:absolute;left:0;right:0;
+    display:flex;align-items:flex-start;justify-content:flex-end;
+    padding:18px 24px 0 0;
+  }
+  .zone-label{
+    font-family:'Cormorant Garamond',serif;
+    font-style:italic;
+    color:rgba(232,220,196,.35);
+    font-size:13px;
+    letter-spacing:.25em;
+    text-transform:uppercase;
+    writing-mode:vertical-rl;
+    transform:rotate(180deg);
+    border-right:1px solid rgba(232,220,196,.2);
+    padding:8px 4px;
+  }
+  .zone-label b{
+    font-family:'Shippori Mincho',serif;
+    font-weight:500;
+    font-style:normal;
+    display:block;
+    color:rgba(232,220,196,.55);
+    letter-spacing:.15em;
+    margin-bottom:6px;
+    font-size:14px;
+  }
+
+  /* bioluminescent particles */
+  .spark{
+    position:absolute;
+    width:2px;height:2px;
+    border-radius:50%;
+    background:var(--glow);
+    box-shadow:0 0 4px var(--glow),0 0 10px var(--glow);
+    opacity:0;
+  }
+
+  /* sun rays in surface zone */
+  .ray{
+    position:absolute;
+    top:0;width:2px;height:260px;
+    background:linear-gradient(to bottom,rgba(255,245,210,.5),transparent);
+    transform-origin:top center;
+    opacity:.7;
+  }
+
+  /* =============== FIXED UI ON OCEAN =============== */
+  #boat{
+    position:absolute;left:50%;top:8px;
+    transform:translateX(-50%);
+    pointer-events:none;z-index:5;
+  }
+  #depth-hud{
+    position:absolute;top:16px;left:20px;
+    font-family:'JetBrains Mono',monospace;
+    color:var(--paper);
+    background:rgba(4,12,24,.55);
+    backdrop-filter:blur(6px);
+    padding:10px 14px;
+    border:1px solid rgba(200,155,60,.4);
+    border-radius:2px;
+    z-index:10;
+    min-width:140px;
+  }
+  #depth-hud .label{
+    font-family:'Cormorant Garamond',serif;
+    font-style:italic;
+    font-size:11px;
+    letter-spacing:.3em;
+    text-transform:uppercase;
+    color:var(--gold-bright);
+    opacity:.8;
+    margin-bottom:4px;
+  }
+  #depth-hud .depth-val{
+    font-size:28px;
+    font-weight:600;
+    color:var(--paper);
+    line-height:1;
+  }
+  #depth-hud .depth-val span{font-size:14px;color:var(--gold);margin-left:3px;font-weight:400;}
+  #zone-now{
+    font-family:'Shippori Mincho',serif;
+    font-size:13px;
+    letter-spacing:.2em;
+    margin-top:8px;
+    color:var(--paper-dark);
+    border-top:1px dashed rgba(200,155,60,.3);
+    padding-top:6px;
+  }
+
+  /* fishing line (fixed position, world scrolls behind) */
+  #line-wrap{
+    position:absolute;left:50%;top:0;bottom:0;
+    width:2px;
+    transform:translateX(-50%);
+    pointer-events:none;
+    z-index:3;
+  }
+  #line{
+    position:absolute;left:0;right:0;
+    top:24px;
+    height:0;
+    background:linear-gradient(to bottom,rgba(232,220,196,.6),rgba(232,220,196,.2));
+    box-shadow:0 0 4px rgba(0,0,0,.4);
+  }
+  #hook{
+    position:absolute;left:50%;
+    top:24px;
+    transform:translate(-50%,0);
+    width:40px;height:40px;
+    z-index:4;
+    pointer-events:none;
+  }
+  #hook svg{width:100%;height:100%;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6));}
+
+  /* bite indicator */
+  .bite-ring{
+    position:absolute;left:50%;top:50%;
+    width:60px;height:60px;
+    border:2px solid var(--gold-bright);
+    border-radius:50%;
+    transform:translate(-50%,-50%) scale(0);
+    opacity:0;
+    pointer-events:none;
+  }
+  .bite-ring.active{
+    animation:bitePulse 1.1s ease-out infinite;
+  }
+  @keyframes bitePulse{
+    0%{transform:translate(-50%,-50%) scale(.4);opacity:1;}
+    100%{transform:translate(-50%,-50%) scale(2.2);opacity:0;}
+  }
+
+  /* creature floating in ocean */
+  .creature{
+    position:absolute;
+    transition:transform .3s;
+    pointer-events:none;
+  }
+  .creature svg{display:block;}
+  .creature.caught{
+    animation:hookedWiggle .3s ease-in-out infinite;
+  }
+  @keyframes hookedWiggle{
+    0%,100%{transform:rotate(-8deg);}
+    50%{transform:rotate(8deg);}
+  }
+
+  /* depth markers on left side of ocean */
+  .depth-tick{
+    position:absolute;left:0;
+    padding-left:8px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    color:rgba(232,220,196,.3);
+    border-left:1px solid rgba(232,220,196,.15);
+    padding-top:2px;padding-bottom:2px;
+    letter-spacing:.1em;
+  }
+
+  /* =============== PANEL =============== */
+  #panel{
+    position:relative;
+    background:
+      radial-gradient(ellipse at 30% 10%,rgba(200,155,60,.12),transparent 60%),
+      linear-gradient(135deg,#e8dcc4 0%,#d8c9a8 100%);
+    color:var(--ink);
+    padding:28px 28px 22px;
+    overflow-y:auto;
+    box-shadow:-20px 0 50px rgba(0,0,0,.5),inset 8px 0 0 0 rgba(0,0,0,.05);
+    border-left:1px solid rgba(74,56,40,.3);
+  }
+  #panel::before{
+    content:"";position:absolute;inset:0;
+    background-image:
+      radial-gradient(circle at 20% 80%,rgba(139,58,31,.08) 0,transparent 40%),
+      radial-gradient(circle at 80% 20%,rgba(74,56,40,.06) 0,transparent 40%);
+    pointer-events:none;
+  }
+  #panel::after{
+    content:"";position:absolute;inset:0;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence baseFrequency='0.85' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.25 0 0 0 0 0.18 0 0 0 0 0.1 0 0 0 0.15 0'/></filter><rect width='200' height='200' filter='url(%23n)'/></svg>");
+    opacity:.4;
+    mix-blend-mode:multiply;
+    pointer-events:none;
+  }
+  #panel > *{position:relative;z-index:1;}
+
+  .masthead{
+    text-align:center;
+    padding-bottom:16px;
+    margin-bottom:18px;
+    border-bottom:1px double var(--ink-soft);
+    position:relative;
+  }
+  .masthead::before,.masthead::after{
+    content:"◆";
+    position:absolute;
+    top:38%;
+    color:var(--gold);
+    font-size:10px;
+  }
+  .masthead::before{left:8px;}
+  .masthead::after{right:8px;}
+  .masthead .title{
+    font-size:22px;
+    font-weight:800;
+    letter-spacing:.35em;
+    line-height:1.2;
+    margin-bottom:4px;
+  }
+  .masthead .subtitle{
+    font-family:'Cormorant Garamond',serif;
+    font-style:italic;
+    font-size:12px;
+    color:var(--ink-soft);
+    letter-spacing:.2em;
+  }
+  .masthead .flourish{
+    margin-top:8px;font-size:14px;color:var(--gold);letter-spacing:1em;
+  }
+
+  /* =============== STATE DISPLAY =============== */
+  .card{
+    background:rgba(255,251,240,.5);
+    border:1px solid rgba(74,56,40,.25);
+    padding:14px 16px;
+    margin-bottom:14px;
+    position:relative;
+  }
+  .card-label{
+    font-family:'Cormorant Garamond',serif;
+    font-style:italic;
+    font-size:11px;
+    color:var(--ink-soft);
+    letter-spacing:.25em;
+    text-transform:uppercase;
+    margin-bottom:6px;
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .card-label .side{letter-spacing:.1em;color:var(--gold);font-style:normal;font-weight:600;}
+
+  #status-card .status-text{
+    font-size:15px;
+    letter-spacing:.1em;
+    color:var(--ink);
+    min-height:22px;
+  }
+  #status-card .status-hint{
+    font-family:'Cormorant Garamond',serif;
+    font-style:italic;
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-top:4px;
+    min-height:18px;
+  }
+
+  /* progress bar */
+  #reel-bar-wrap{
+    height:0;overflow:hidden;
+    transition:height .25s;
+    margin-top:10px;
+  }
+  #reel-bar-wrap.active{height:28px;}
+  #reel-bar{
+    height:100%;
+    background:#3d2a1c;
+    border:1px solid var(--ink-soft);
+    position:relative;
+    overflow:hidden;
+  }
+  #reel-bar-fill{
+    height:100%;
+    width:0%;
+    background:linear-gradient(90deg,var(--rust),var(--gold-bright));
+    transition:width .1s linear;
+    box-shadow:0 0 10px var(--gold-bright);
+  }
+  #reel-bar-label{
+    position:absolute;inset:0;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--paper);
+    letter-spacing:.2em;
+    mix-blend-mode:difference;
+  }
+
+  /* =============== BUTTON =============== */
+  .btn{
+    display:block;width:100%;
+    padding:14px;
+    background:var(--ink);
+    color:var(--paper);
+    border:1px solid var(--ink);
+    font-family:'Shippori Mincho',serif;
+    font-size:15px;
+    font-weight:500;
+    letter-spacing:.4em;
+    cursor:pointer;
+    position:relative;
+    text-transform:uppercase;
+    transition:all .15s;
+  }
+  .btn::before{
+    content:"";position:absolute;inset:3px;
+    border:1px solid var(--gold);
+    pointer-events:none;
+    transition:inset .15s;
+  }
+  .btn:hover::before{inset:6px;}
+  .btn:active{transform:translateY(1px);}
+  .btn.btn-reel{
+    background:var(--rust);
+    border-color:var(--rust);
+    animation:reelGlow 1.2s ease-in-out infinite;
+  }
+  @keyframes reelGlow{
+    0%,100%{box-shadow:0 0 0 rgba(200,155,60,0);}
+    50%{box-shadow:0 0 20px rgba(228,184,87,.6);}
+  }
+  .btn[disabled]{
+    opacity:.4;cursor:not-allowed;pointer-events:none;
+  }
+  .btn-secondary{
+    background:transparent;
+    color:var(--ink);
+    border:1px solid var(--ink-soft);
+    margin-top:8px;
+    font-size:12px;
+    letter-spacing:.3em;
+    padding:10px;
+  }
+  .btn-secondary::before{display:none;}
+  .btn-secondary:hover{background:rgba(74,56,40,.1);}
+
+  /* =============== COLLECTION =============== */
+  .stats-row{
+    display:grid;grid-template-columns:1fr 1fr 1fr;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .stat{
+    text-align:center;
+    padding:10px 6px;
+    border:1px solid rgba(74,56,40,.25);
+    background:rgba(255,251,240,.4);
+  }
+  .stat .n{
+    font-family:'JetBrains Mono',monospace;
+    font-size:20px;font-weight:600;
+    color:var(--ink);
+  }
+  .stat .l{
+    font-size:9px;letter-spacing:.25em;color:var(--ink-soft);
+    margin-top:2px;
+  }
+
+  /* =============== CATALOG OVERLAY =============== */
+  #catalog{
+    position:fixed;inset:0;
+    background:rgba(2,5,10,.85);
+    backdrop-filter:blur(8px);
+    z-index:100;
+    display:none;
+    align-items:center;justify-content:center;
+    padding:20px;
+  }
+  #catalog.open{display:flex;}
+  #catalog-inner{
+    background:linear-gradient(135deg,#e8dcc4 0%,#d8c9a8 100%);
+    width:100%;max-width:820px;max-height:88vh;
+    overflow-y:auto;
+    padding:32px 28px;
+    position:relative;
+    box-shadow:0 20px 60px rgba(0,0,0,.8);
+    border:1px solid var(--ink-soft);
+  }
+  #catalog-inner::after{
+    content:"";position:absolute;inset:0;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence baseFrequency='0.85' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.25 0 0 0 0 0.18 0 0 0 0 0.1 0 0 0 0.15 0'/></filter><rect width='200' height='200' filter='url(%23n)'/></svg>");
+    opacity:.4;mix-blend-mode:multiply;pointer-events:none;
+  }
+  #catalog-inner > *{position:relative;z-index:1;}
+  #catalog-close{
+    position:absolute;top:14px;right:14px;
+    width:32px;height:32px;
+    background:transparent;border:1px solid var(--ink-soft);
+    color:var(--ink);font-size:16px;cursor:pointer;
+    font-family:'JetBrains Mono',monospace;
+  }
+  #catalog-close:hover{background:var(--ink);color:var(--paper);}
+  .cat-head{
+    text-align:center;
+    padding-bottom:14px;margin-bottom:18px;
+    border-bottom:1px double var(--ink-soft);
+  }
+  .cat-head h2{
+    font-size:20px;letter-spacing:.3em;font-weight:700;
+  }
+  .cat-head .sub{
+    font-family:'Cormorant Garamond',serif;
+    font-style:italic;font-size:12px;color:var(--ink-soft);
+    letter-spacing:.15em;margin-top:4px;
+  }
+  .zone-group{
+    margin-bottom:22px;
+  }
+  .zone-group h3{
+    font-family:'Cormorant Garamond',serif;
+    font-size:14px;font-weight:600;
+    letter-spacing:.2em;
+    padding-bottom:6px;
+    margin-bottom:12px;
+    border-bottom:1px solid var(--ink-soft);
+    display:flex;justify-content:space-between;
+    color:var(--ink);
+  }
+  .zone-group h3 .depth-range{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:400;
+    color:var(--ink-soft);
+    font-size:11px;
+  }
+  .creatures-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+    gap:12px;
+  }
+  .cre-card{
+    border:1px solid rgba(74,56,40,.3);
+    background:rgba(255,251,240,.5);
+    padding:10px;
+    text-align:center;
+    transition:all .2s;
+  }
+  .cre-card.undiscovered{
+    opacity:.35;
+    background:rgba(74,56,40,.08);
+  }
+  .cre-card .art{
+    height:70px;
+    display:flex;align-items:center;justify-content:center;
+    margin-bottom:8px;
+    background:radial-gradient(circle,rgba(7,30,61,.15),transparent 70%);
+  }
+  .cre-card.undiscovered .art{filter:blur(4px) grayscale(1);opacity:.6;}
+  .cre-card .name{
+    font-size:12px;font-weight:500;letter-spacing:.1em;
+    color:var(--ink);
+    min-height:32px;
+  }
+  .cre-card.undiscovered .name{color:var(--ink-soft);}
+  .cre-card .rarity{
+    font-size:13px;
+    margin-top:4px;
+    letter-spacing:.15em;
+  }
+  .rarity-common{color:#7a8a6a;}
+  .rarity-uncommon{color:#5a8aaa;}
+  .rarity-rare{color:#aa5a8a;}
+  .rarity-legendary{color:#c89b3c;}
+  .rarity-mythical{color:#9a4ac8;text-shadow:0 0 8px rgba(154,74,200,.4);}
+  .cre-card .count{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    color:var(--ink-soft);
+    margin-top:2px;
+  }
+
+  /* =============== CATCH POPUP =============== */
+  #catch-popup{
+    position:fixed;inset:0;
+    display:none;
+    align-items:center;justify-content:center;
+    z-index:200;
+    background:radial-gradient(ellipse at center,rgba(200,155,60,.2),rgba(2,5,10,.7));
+    backdrop-filter:blur(4px);
+    padding:20px;
+  }
+  #catch-popup.open{display:flex;animation:fadeIn .5s;}
+  @keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+  #catch-popup-inner{
+    text-align:center;
+    background:linear-gradient(135deg,#e8dcc4 0%,#d8c9a8 100%);
+    padding:28px 32px;
+    max-width:380px;width:100%;
+    border:1px solid var(--ink-soft);
+    box-shadow:0 0 60px rgba(228,184,87,.4),0 20px 40px rgba(0,0,0,.6);
+    position:relative;
+    animation:popIn .6s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes popIn{
+    0%{transform:scale(.5) rotate(-5deg);opacity:0;}
+    100%{transform:scale(1) rotate(0);opacity:1;}
+  }
+  #catch-popup .caught-banner{
+    font-family:'Cormorant Garamond',serif;
+    font-style:italic;
+    font-size:12px;
+    letter-spacing:.5em;
+    color:var(--gold);
+    text-transform:uppercase;
+    margin-bottom:10px;
+  }
+  #catch-popup .caught-art{
+    height:120px;
+    display:flex;align-items:center;justify-content:center;
+    margin:8px 0 14px;
+    background:radial-gradient(circle,rgba(7,30,61,.2),transparent 60%);
+  }
+  #catch-popup .caught-name{
+    font-size:22px;font-weight:700;
+    letter-spacing:.2em;
+    margin-bottom:4px;
+  }
+  #catch-popup .caught-sci{
+    font-family:'Cormorant Garamond',serif;
+    font-style:italic;
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-bottom:12px;
+  }
+  #catch-popup .caught-desc{
+    font-size:13px;
+    line-height:1.7;
+    color:var(--ink-soft);
+    padding:10px 0;
+    border-top:1px dashed rgba(74,56,40,.4);
+    border-bottom:1px dashed rgba(74,56,40,.4);
+    margin-bottom:12px;
+  }
+  #catch-popup .caught-meta{
+    display:flex;justify-content:space-around;
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--ink-soft);
+    margin-bottom:14px;
+  }
+  #catch-popup .caught-meta b{color:var(--ink);font-weight:600;font-family:'Shippori Mincho',serif;font-size:14px;letter-spacing:.1em;}
+  #catch-popup .btn{font-size:13px;padding:10px;}
+
+  /* =============== ESCAPE POPUP =============== */
+  #escape-popup{
+    position:fixed;inset:0;
+    display:none;
+    align-items:center;justify-content:center;
+    z-index:200;
+    background:rgba(2,5,10,.7);
+    backdrop-filter:blur(4px);
+    padding:20px;
+  }
+  #escape-popup.open{display:flex;animation:fadeIn .3s;}
+  #escape-popup-inner{
+    text-align:center;
+    background:linear-gradient(135deg,#e8dcc4 0%,#d8c9a8 100%);
+    padding:24px 28px;
+    max-width:340px;
+    border:1px solid var(--rust);
+    box-shadow:0 20px 40px rgba(0,0,0,.6);
+  }
+  #escape-popup h3{
+    font-size:18px;letter-spacing:.3em;color:var(--rust);
+    margin-bottom:8px;
+  }
+  #escape-popup p{
+    font-family:'Cormorant Garamond',serif;
+    font-style:italic;
+    color:var(--ink-soft);
+    font-size:13px;line-height:1.6;
+    margin-bottom:14px;
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar{width:8px;}
+  ::-webkit-scrollbar-track{background:rgba(0,0,0,.1);}
+  ::-webkit-scrollbar-thumb{background:var(--ink-soft);}
+
+  /* wrap long text */
+  .muted{color:var(--ink-soft);font-style:italic;font-family:'Cormorant Garamond',serif;}
+
+  /* =============== BITE ALERT =============== */
+  #bite-banner{
+    position:absolute;
+    top:50%;left:50%;
+    transform:translate(-50%,-50%) scale(0);
+    font-family:'Shippori Mincho',serif;
+    font-weight:800;
+    font-size:clamp(48px,8vw,96px);
+    color:#ffeb88;
+    text-shadow:
+      0 0 20px #f2d04a,
+      0 0 40px #e4b857,
+      0 4px 12px rgba(0,0,0,.8),
+      0 0 2px #000;
+    letter-spacing:.15em;
+    pointer-events:none;
+    z-index:20;
+    opacity:0;
+    white-space:nowrap;
+  }
+  #bite-banner.show{
+    animation:biteBanner 1.2s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes biteBanner{
+    0%{transform:translate(-50%,-50%) scale(0) rotate(-10deg);opacity:0;}
+    20%{transform:translate(-50%,-50%) scale(1.3) rotate(5deg);opacity:1;}
+    40%{transform:translate(-50%,-50%) scale(.95) rotate(-3deg);opacity:1;}
+    55%{transform:translate(-50%,-50%) scale(1.05) rotate(1deg);opacity:1;}
+    70%{transform:translate(-50%,-50%) scale(1) rotate(0);opacity:1;}
+    100%{transform:translate(-50%,-50%) scale(1) rotate(0);opacity:0;}
+  }
+
+  /* ocean shake on bite */
+  #scene.shake{animation:oceanShake .5s ease-in-out;}
+  @keyframes oceanShake{
+    0%,100%{margin-left:0;}
+    20%{margin-left:-8px;}
+    40%{margin-left:8px;}
+    60%{margin-left:-5px;}
+    80%{margin-left:5px;}
+  }
+
+  /* hook wiggle on bite */
+  #hook.biting{animation:hookBite .2s ease-in-out infinite;}
+  @keyframes hookBite{
+    0%,100%{transform:translate(-50%,0) rotate(-12deg);}
+    50%{transform:translate(-50%,0) rotate(12deg);}
+  }
+  #line.biting{animation:lineBite .15s ease-in-out infinite;}
+  @keyframes lineBite{
+    0%,100%{margin-left:0;}
+    50%{margin-left:3px;}
+  }
+
+  /* bigger, bolder bite ring */
+  .bite-ring.active{
+    width:80px;height:80px;
+    border-width:3px;
+    animation:bitePulse .8s ease-out infinite;
+  }
+
+  /* =============== TIME BAR =============== */
+  #time-bar-wrap{
+    height:0;overflow:hidden;
+    transition:height .25s;
+    margin-top:6px;
+  }
+  #time-bar-wrap.active{height:8px;}
+  #time-bar{
+    height:100%;
+    background:#3d2a1c;
+    border:1px solid var(--ink-soft);
+    position:relative;
+    overflow:hidden;
+  }
+  #time-bar-fill{
+    height:100%;
+    width:100%;
+    background:linear-gradient(90deg,#d84a4a,#f2d04a);
+    transition:width .1s linear;
+  }
+  #time-bar-fill.warn{
+    animation:timeWarn .3s ease-in-out infinite;
+  }
+  @keyframes timeWarn{
+    0%,100%{opacity:1;}
+    50%{opacity:.5;}
+  }
+
+  /* reel bar improvements */
+  #reel-bar-wrap.active{height:34px;}
+  #reel-bar-fill{
+    transition:width .08s ease-out;
+  }
+  #reel-bar-fill.bump{
+    animation:reelBump .15s ease-out;
+  }
+  @keyframes reelBump{
+    0%{filter:brightness(1);}
+    50%{filter:brightness(1.6);box-shadow:0 0 20px var(--gold-bright);}
+    100%{filter:brightness(1);}
+  }
+
+  /* =============== TAP FEEDBACK =============== */
+  .tap-float{
+    position:absolute;
+    font-family:'JetBrains Mono',monospace;
+    font-weight:600;
+    font-size:20px;
+    color:var(--gold-bright);
+    text-shadow:0 2px 6px rgba(0,0,0,.8);
+    pointer-events:none;
+    animation:tapFloat .7s ease-out forwards;
+    z-index:15;
+  }
+  @keyframes tapFloat{
+    0%{transform:translate(-50%,0) scale(.5);opacity:0;}
+    20%{transform:translate(-50%,-10px) scale(1.2);opacity:1;}
+    100%{transform:translate(-50%,-60px) scale(1);opacity:0;}
+  }
+
+  /* button strong active feedback */
+  .btn-reel:active{
+    transform:scale(.96);
+    box-shadow:0 0 30px var(--gold-bright) !important;
+  }
+  .btn-reel.tap-flash{
+    animation:btnFlash .18s ease-out;
+  }
+  @keyframes btnFlash{
+    0%{background:var(--rust);}
+    50%{background:var(--gold-bright);color:var(--ink);}
+    100%{background:var(--rust);}
+  }
+
+  /* pulse the button strongly during bite */
+  .btn.btn-bite{
+    background:var(--gold-bright);
+    color:var(--ink);
+    border-color:var(--gold-bright);
+    animation:biteBtn .5s ease-in-out infinite;
+  }
+  @keyframes biteBtn{
+    0%,100%{
+      box-shadow:0 0 0 0 rgba(242,208,74,.8);
+      transform:scale(1);
+    }
+    50%{
+      box-shadow:0 0 0 16px rgba(242,208,74,0);
+      transform:scale(1.04);
+    }
+  }
+  .btn.btn-bite::before{border-color:var(--ink);inset:6px;}
+</style>
+</head>
+<body>
+
+<div id="game">
+
+  <!-- ============ OCEAN VIEW ============ -->
+  <div id="ocean">
+
+    <div id="depth-hud">
+      <div class="label">Depth · 水深</div>
+      <div class="depth-val" id="depth-val">0<span>m</span></div>
+      <div id="zone-now">海面</div>
+    </div>
+
+    <div id="scene"><!-- generated zones/creatures --></div>
+
+    <!-- boat -->
+    <svg id="boat" width="70" height="30" viewBox="0 0 70 30">
+      <path d="M5 14 L12 6 L58 6 L65 14 Z" fill="#3d2a1c" stroke="#1a1208" stroke-width="1.5"/>
+      <rect x="32" y="0" width="3" height="10" fill="#1a1208"/>
+      <path d="M35 1 L35 10 L48 6 Z" fill="#c9b896" stroke="#1a1208" stroke-width=".5"/>
+    </svg>
+
+    <!-- huge bite banner -->
+    <div id="bite-banner">アタリ！</div>
+
+    <!-- fishing line and hook stay fixed, scene scrolls behind -->
+    <div id="line-wrap">
+      <div id="line"></div>
+    </div>
+    <div id="hook">
+      <svg viewBox="0 0 40 40">
+        <path d="M20 0 L20 18 Q20 28 14 28 Q8 28 8 22 L10 22 Q10 26 14 26 Q18 26 18 22 L18 18 L20 18" fill="none" stroke="#c9b896" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="13" cy="19" r="2.5" fill="#c89b3c"/>
+      </svg>
+      <div class="bite-ring" id="bite-ring"></div>
+    </div>
+  </div>
+
+  <!-- ============ CONTROL PANEL ============ -->
+  <div id="panel">
+    <div class="masthead">
+      <div class="title">深海つり</div>
+      <div class="subtitle">Abyssal Chronicle · MDCCCLXX</div>
+      <div class="flourish">⚓ ⚓ ⚓</div>
+    </div>
+
+    <div class="card" id="status-card">
+      <div class="card-label">状況 <span class="side" id="status-side">待機</span></div>
+      <div class="status-text" id="status-text">仕掛けを投下する準備ができました。</div>
+      <div class="status-hint" id="status-hint">Ready to cast your line.</div>
+      <div id="reel-bar-wrap">
+        <div id="reel-bar">
+          <div id="reel-bar-fill"></div>
+          <div id="reel-bar-label">REELING</div>
+        </div>
+      </div>
+      <div id="time-bar-wrap">
+        <div id="time-bar">
+          <div id="time-bar-fill"></div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn" id="action-btn">仕掛けを投下</button>
+
+    <div class="stats-row" style="margin-top:18px">
+      <div class="stat"><div class="n" id="stat-total">0</div><div class="l">捕獲種数</div></div>
+      <div class="stat"><div class="n" id="stat-max">0<span style="font-size:11px">m</span></div><div class="l">最深記録</div></div>
+      <div class="stat"><div class="n" id="stat-casts">0</div><div class="l">投下回数</div></div>
+    </div>
+
+    <button class="btn btn-secondary" id="open-catalog">図鑑を開く — Catalogue</button>
+
+    <div style="margin-top:16px;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:11px;color:var(--ink-soft);text-align:center;line-height:1.5;">
+      海面をタップ/クリックで投下・停止・早巻きの操作が可能です
+    </div>
+  </div>
+
+  <!-- ============ CATALOG ============ -->
+  <div id="catalog">
+    <div id="catalog-inner">
+      <button id="catalog-close">✕</button>
+      <div class="cat-head">
+        <h2>深海生物図鑑</h2>
+        <div class="sub">— Encyclopedia Abyssalis —</div>
+      </div>
+      <div id="catalog-body"></div>
+    </div>
+  </div>
+
+  <!-- ============ CATCH POPUP ============ -->
+  <div id="catch-popup">
+    <div id="catch-popup-inner">
+      <div class="caught-banner">— 捕獲に成功 —</div>
+      <div class="caught-art" id="cp-art"></div>
+      <div class="caught-name" id="cp-name"></div>
+      <div class="caught-sci" id="cp-sci"></div>
+      <div class="caught-desc" id="cp-desc"></div>
+      <div class="caught-meta">
+        <div>水深 · <b id="cp-depth"></b></div>
+        <div>珍度 · <b id="cp-rarity"></b></div>
+      </div>
+      <button class="btn" id="cp-close">続ける</button>
+    </div>
+  </div>
+
+  <!-- ============ ESCAPE POPUP ============ -->
+  <div id="escape-popup">
+    <div id="escape-popup-inner">
+      <h3>逃げられた</h3>
+      <p>糸が切れ、深海の獲物は闇に帰った。<br><em>The line went slack...</em></p>
+      <button class="btn" id="ep-close">続ける</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =================== DATA ===================
+// Zones (depth in meters). Scene renders 11000m tall with 1m = 0.8px => 8800px
+const METERS_PER_PX = 1/0.8; // 0.8px per meter
+const WORLD_PX = 11000 * 0.8; // 8800px
+
+const ZONES = [
+  {id:'surface',min:0,max:200,name:'有光層',en:'Epipelagic',color1:'#6eb1d4',color2:'#3673a1'},
+  {id:'twilight',min:200,max:1000,name:'薄明層',en:'Mesopelagic',color1:'#3673a1',color2:'#143d6b'},
+  {id:'midnight',min:1000,max:4000,name:'暗黒層',en:'Bathypelagic',color1:'#143d6b',color2:'#071e3d'},
+  {id:'abyss',min:4000,max:6000,name:'深海層',en:'Abyssopelagic',color1:'#071e3d',color2:'#01040c'},
+  {id:'hadal',min:6000,max:11000,name:'超深海層',en:'Hadal',color1:'#01040c',color2:'#000000'}
+];
+
+function zoneAt(d){
+  return ZONES.find(z => d >= z.min && d < z.max) || ZONES[ZONES.length-1];
+}
+
+// Creatures: simple inline SVG art. rarity weights: common=10, uncommon=4, rare=1.5, legendary=.5, mythical=.15
+const CREATURES = [
+  // SURFACE
+  {id:'sardine',name:'マイワシ',sci:'Sardinops melanostictus',zone:'surface',rarity:'common',minD:5,maxD:120,
+   desc:'銀鱗の小魚。群れをなして浅瀬を舞う、漁師の友。',
+   svg:`<svg viewBox="0 0 100 40" width="90" height="36"><path d="M10 20 Q30 5 70 15 L92 18 L70 25 Q30 35 10 20 Z" fill="#c5d4d8" stroke="#3a4a50" stroke-width="1"/><circle cx="75" cy="18" r="2" fill="#1a1a1a"/><path d="M10 20 L2 10 L2 30 Z" fill="#8aa0a8"/></svg>`},
+  {id:'mackerel',name:'サバ',sci:'Scomber japonicus',zone:'surface',rarity:'common',minD:10,maxD:180,
+   desc:'背に波紋を宿す俊敏な回遊魚。青い背、白い腹。',
+   svg:`<svg viewBox="0 0 110 44" width="100" height="40"><path d="M10 22 Q35 5 78 16 L100 20 L78 28 Q35 40 10 22 Z" fill="#4a6b8c" stroke="#1a2a3a" stroke-width="1"/><path d="M25 15 Q40 14 60 14 M30 20 Q45 18 65 18 M28 25 Q45 27 62 27" stroke="#1a2a3a" stroke-width=".8" fill="none"/><circle cx="82" cy="20" r="2" fill="#1a1a1a"/><path d="M10 22 L0 10 L0 34 Z" fill="#2a4a6a"/></svg>`},
+  {id:'flyingfish',name:'トビウオ',sci:'Cypselurus hiraii',zone:'surface',rarity:'uncommon',minD:0,maxD:80,
+   desc:'海面を滑空する翼を持つ魚。夏の使者。',
+   svg:`<svg viewBox="0 0 120 60" width="100" height="50"><path d="M10 35 Q40 25 85 30 L110 33 L85 38 Q40 42 10 35 Z" fill="#8aa8c0" stroke="#2a3a4a" stroke-width="1"/><path d="M30 30 Q50 5 85 20 Z" fill="#b0c8d8" opacity=".85" stroke="#2a3a4a" stroke-width=".8"/><path d="M35 40 Q55 55 80 45 Z" fill="#b0c8d8" opacity=".85" stroke="#2a3a4a" stroke-width=".8"/><circle cx="92" cy="33" r="2" fill="#1a1a1a"/><path d="M10 35 L0 25 L0 45 Z" fill="#4a6880"/></svg>`},
+  {id:'seabream',name:'マダイ',sci:'Pagrus major',zone:'surface',rarity:'uncommon',minD:20,maxD:200,
+   desc:'赤く輝く格式ある魚。祝いの席にふさわしき海の王者。',
+   svg:`<svg viewBox="0 0 110 60" width="95" height="52"><path d="M10 30 Q28 8 65 16 L95 22 L95 38 L65 44 Q28 52 10 30 Z" fill="#d66a6a" stroke="#5a1a1a" stroke-width="1"/><path d="M95 22 L108 15 L108 45 L95 38 Z" fill="#a83a3a" stroke="#5a1a1a" stroke-width="1"/><circle cx="72" cy="25" r="2.5" fill="#1a0a0a"/><path d="M30 18 L35 12 M45 16 L48 10 M55 16 L58 11" stroke="#8a2a2a" stroke-width=".8"/></svg>`},
+  {id:'tuna',name:'クロマグロ',sci:'Thunnus orientalis',zone:'surface',rarity:'rare',minD:50,maxD:200,
+   desc:'海を駆ける青き巨影。黒鮪と呼ばれる王者。',
+   svg:`<svg viewBox="0 0 140 56" width="120" height="48"><path d="M10 28 Q40 5 95 18 L125 25 L95 35 Q40 50 10 28 Z" fill="#2a4a6a" stroke="#0a1a2a" stroke-width="1.2"/><path d="M125 25 L138 18 L138 34 L125 30 Z" fill="#0a1a2a"/><path d="M100 14 L108 5 L110 14 Z M100 40 L108 48 L110 40 Z" fill="#6a8aa8"/><circle cx="108" cy="24" r="2.5" fill="#f2d04a"/><circle cx="108" cy="24" r="1.2" fill="#000"/><path d="M10 28 L0 16 L0 40 Z" fill="#1a2a3a"/></svg>`},
+  {id:'sunfish',name:'マンボウ',sci:'Mola mola',zone:'surface',rarity:'rare',minD:30,maxD:600,
+   desc:'楕円の巨体をゆらりと揺らす奇妙な巨魚。海月を愛食す。',
+   svg:`<svg viewBox="0 0 100 90" width="90" height="82"><ellipse cx="48" cy="45" rx="38" ry="34" fill="#7a8a9a" stroke="#2a3a4a" stroke-width="1.2"/><path d="M48 10 Q60 5 58 20 L48 22 Z" fill="#5a6a7a" stroke="#2a3a4a"/><path d="M48 80 Q60 85 58 70 L48 68 Z" fill="#5a6a7a" stroke="#2a3a4a"/><path d="M84 45 Q98 40 96 50 Q98 55 84 50 Z" fill="#5a6a7a" stroke="#2a3a4a" stroke-width="1"/><circle cx="20" cy="40" r="3" fill="#1a1a1a"/><circle cx="20" cy="40" r="1" fill="#fff"/><path d="M10 48 Q16 52 22 50" stroke="#2a3a4a" stroke-width="1.5" fill="none"/></svg>`},
+  {id:'jelly',name:'ミズクラゲ',sci:'Aurelia aurita',zone:'surface',rarity:'common',minD:0,maxD:100,
+   desc:'透き通る傘の下、四葉の紋様を宿す。',
+   svg:`<svg viewBox="0 0 80 80" width="74" height="74"><ellipse cx="40" cy="28" rx="32" ry="20" fill="rgba(200,220,240,.6)" stroke="#4a7aaa" stroke-width="1"/><path d="M10 28 Q40 32 70 28" stroke="#4a7aaa" stroke-width="1" fill="none"/><circle cx="28" cy="30" r="4" fill="none" stroke="#c84a7a" stroke-width="1"/><circle cx="40" cy="32" r="4" fill="none" stroke="#c84a7a" stroke-width="1"/><circle cx="52" cy="30" r="4" fill="none" stroke="#c84a7a" stroke-width="1"/><path d="M18 38 Q18 60 14 72 M30 42 Q28 64 22 75 M40 42 Q40 66 38 76 M50 42 Q52 64 58 75 M62 38 Q62 60 66 72" stroke="rgba(200,220,240,.7)" stroke-width="1" fill="none"/></svg>`},
+  {id:'bonito',name:'カツオ',sci:'Katsuwonus pelamis',zone:'surface',rarity:'common',minD:10,maxD:200,
+   desc:'銀腹に黒条を刻む駿足の回遊魚。鰹節の母なる魚。',
+   svg:`<svg viewBox="0 0 110 40" width="95" height="36"><path d="M10 20 Q35 6 78 14 L100 18 L78 26 Q35 34 10 20 Z" fill="#3a5870" stroke="#0a1a2a" stroke-width="1"/><path d="M30 24 L72 24 M30 27 L68 27 M30 30 L62 30" stroke="#0a1a2a" stroke-width=".6"/><path d="M100 18 L112 12 L112 28 L100 22 Z" fill="#0a1a2a"/><circle cx="82" cy="18" r="2" fill="#1a1a1a"/><path d="M10 20 L0 8 L0 32 Z" fill="#1a2a3a"/></svg>`},
+  {id:'horsemackerel',name:'マアジ',sci:'Trachurus japonicus',zone:'surface',rarity:'common',minD:10,maxD:200,
+   desc:'食卓で親しまれる小型の青魚。鋸歯状の側線を持つ。',
+   svg:`<svg viewBox="0 0 100 40" width="88" height="35"><path d="M10 20 Q28 6 65 13 L92 18 L65 27 Q28 34 10 20 Z" fill="#a8b8c8" stroke="#3a4a5a" stroke-width="1"/><path d="M25 22 Q40 23 60 22 L75 21" stroke="#3a4a5a" stroke-width="1.2" fill="none"/><circle cx="72" cy="17" r="2" fill="#1a1a1a"/><path d="M92 18 L102 14 L102 24 L92 20 Z" fill="#7a8a9a"/><path d="M10 20 L0 10 L0 30 Z" fill="#7a8a9a"/></svg>`},
+  {id:'flounder',name:'ヒラメ',sci:'Paralichthys olivaceus',zone:'surface',rarity:'uncommon',minD:30,maxD:200,
+   desc:'砂地に擬態する平らな魚。両眼が体の左側に並ぶ。',
+   svg:`<svg viewBox="0 0 110 60" width="95" height="52"><path d="M5 30 Q30 8 70 12 L100 28 L70 48 Q30 52 5 30 Z" fill="#8a7a5a" stroke="#3a2a0a" stroke-width="1"/><circle cx="20" cy="22" r="3" fill="#1a0a0a"/><circle cx="20" cy="22" r="1" fill="#fff"/><circle cx="32" cy="20" r="3" fill="#1a0a0a"/><circle cx="32" cy="20" r="1" fill="#fff"/><circle cx="50" cy="32" r="2" fill="#3a2a0a" opacity=".6"/><circle cx="65" cy="28" r="2" fill="#3a2a0a" opacity=".6"/><circle cx="78" cy="34" r="2" fill="#3a2a0a" opacity=".6"/><circle cx="60" cy="38" r="2" fill="#3a2a0a" opacity=".6"/></svg>`},
+  {id:'cutlassfish',name:'タチウオ',sci:'Trichiurus lepturus',zone:'surface',rarity:'uncommon',minD:50,maxD:400,
+   desc:'銀色に輝く太刀のような細長い魚。垂直に立ち泳ぐ。',
+   svg:`<svg viewBox="0 0 200 30" width="170" height="26"><path d="M5 15 Q15 8 30 12 L195 14 L195 16 L30 18 Q15 22 5 15 Z" fill="#d8d8e0" stroke="#3a4a5a" stroke-width=".8"/><circle cx="20" cy="14" r="1.8" fill="#1a1a1a"/><path d="M22 11 L26 8" stroke="#3a4a5a" stroke-width=".8"/></svg>`},
+  {id:'puffer',name:'トラフグ',sci:'Takifugu rubripes',zone:'surface',rarity:'uncommon',minD:10,maxD:150,
+   desc:'威嚇すると体を膨らます。猛毒を秘めし美味の魚。',
+   svg:`<svg viewBox="0 0 90 70" width="80" height="62"><ellipse cx="38" cy="38" rx="28" ry="22" fill="#a8a060" stroke="#2a2a0a" stroke-width="1.2"/><path d="M10 50 Q38 60 66 50" fill="#d8d0a0" stroke="#2a2a0a" stroke-width="1"/><circle cx="22" cy="42" r="1.5" fill="#2a1a0a"/><circle cx="35" cy="28" r="1.5" fill="#2a1a0a"/><circle cx="48" cy="32" r="1.5" fill="#2a1a0a"/><circle cx="55" cy="42" r="1.5" fill="#2a1a0a"/><circle cx="40" cy="48" r="1.5" fill="#2a1a0a"/><circle cx="20" cy="36" r="2.5" fill="#fff"/><circle cx="20" cy="36" r="1.2" fill="#000"/><path d="M5 38 Q10 40 14 38" stroke="#2a2a0a" fill="none" stroke-width="1"/><path d="M66 30 L78 24 L78 50 L66 44 Z" fill="#7a7a40" stroke="#2a2a0a"/></svg>`},
+  {id:'turtle',name:'アオウミガメ',sci:'Chelonia mydas',zone:'surface',rarity:'rare',minD:0,maxD:200,
+   desc:'広き海を旅する古代の住人。海藻を食み、波に乗る。',
+   svg:`<svg viewBox="0 0 130 80" width="115" height="72"><ellipse cx="60" cy="40" rx="40" ry="28" fill="#3a6a4a" stroke="#0a2a1a" stroke-width="1.5"/><path d="M30 25 L40 22 L42 32 Z M50 18 L62 18 L60 28 Z M72 18 L85 22 L80 30 Z M30 50 L42 48 L42 60 Z M52 55 L64 58 L60 65 Z M75 50 L88 48 L82 60 Z M50 35 L60 35 L60 45 L50 45 Z M65 35 L75 35 L75 45 L65 45 Z" fill="#5a8a6a" stroke="#0a2a1a" stroke-width=".6"/><ellipse cx="105" cy="35" rx="14" ry="10" fill="#3a6a4a" stroke="#0a2a1a" stroke-width="1.2"/><circle cx="113" cy="33" r="1.5" fill="#1a0a0a"/><path d="M28 25 L10 18 L20 35 Z M28 55 L10 62 L20 45 Z M90 60 L100 70 L86 65 Z" fill="#3a6a4a" stroke="#0a2a1a" stroke-width="1"/></svg>`},
+  {id:'octopus',name:'マダコ',sci:'Octopus vulgaris',zone:'surface',rarity:'common',minD:5,maxD:200,
+   desc:'八本の腕を巧みに使う知恵者。岩陰に潜む。',
+   svg:`<svg viewBox="0 0 100 100" width="88" height="88"><path d="M50 10 Q72 12 75 35 Q72 50 60 55 Q40 50 25 55 Q28 50 25 35 Q28 12 50 10 Z" fill="#a04a5a" stroke="#3a0a1a" stroke-width="1.2"/><circle cx="40" cy="30" r="3" fill="#1a0a0a"/><circle cx="40" cy="30" r="1" fill="#fff"/><circle cx="60" cy="30" r="3" fill="#1a0a0a"/><circle cx="60" cy="30" r="1" fill="#fff"/><path d="M30 50 Q15 65 8 90 M40 55 Q30 75 25 95 M48 56 Q45 78 40 95 M55 56 Q60 78 60 95 M62 55 Q70 75 75 95 M70 50 Q85 65 92 90" stroke="#7a2a3a" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`},
+  {id:'swimmingcrab',name:'ワタリガニ',sci:'Portunus trituberculatus',zone:'surface',rarity:'common',minD:5,maxD:100,
+   desc:'青き甲を持つ俊敏な蟹。砂地を横歩きで疾走す。',
+   svg:`<svg viewBox="0 0 110 70" width="95" height="62"><ellipse cx="55" cy="35" rx="28" ry="18" fill="#3a6080" stroke="#0a2030" stroke-width="1.2"/><path d="M30 30 L8 18 L18 25 M30 40 L8 50 L18 42 M75 30 L98 18 L88 25 M75 40 L98 50 L88 42 M40 22 L32 8 M50 18 L48 4 M65 18 L68 4 M75 22 L84 8" stroke="#0a2030" stroke-width="1.2" fill="none"/><path d="M22 28 L4 24 L0 32 L8 36 Q14 32 22 32 Z M88 28 L106 24 L110 32 L102 36 Q96 32 88 32 Z" fill="#5a809a" stroke="#0a2030" stroke-width="1"/><circle cx="48" cy="28" r="1.5" fill="#1a1a1a"/><circle cx="62" cy="28" r="1.5" fill="#1a1a1a"/><path d="M40 36 Q55 42 70 36" stroke="#0a2030" stroke-width=".8" fill="none"/></svg>`},
+  {id:'swordfish',name:'メカジキ',sci:'Xiphias gladius',zone:'surface',rarity:'rare',minD:50,maxD:600,
+   desc:'長き剣のような吻を持つ海の戦士。時に大型獣を貫く。',
+   svg:`<svg viewBox="0 0 180 50" width="155" height="44"><path d="M40 25 L10 20 L10 30 Z" fill="#1a1a1a" stroke="#0a0a0a" stroke-width=".8"/><path d="M40 22 Q70 8 130 16 L160 25 L130 34 Q70 42 40 28 Z" fill="#3a4858" stroke="#0a1018" stroke-width="1"/><path d="M160 25 L172 18 L172 32 L160 28 Z" fill="#1a1a1a"/><circle cx="55" cy="22" r="1.8" fill="#f2d04a"/><circle cx="55" cy="22" r=".8" fill="#000"/><path d="M75 14 Q82 4 90 12 L88 20 Z" fill="#2a3848" stroke="#0a1018"/><path d="M75 36 Q82 46 90 38 L88 30 Z" fill="#2a3848" stroke="#0a1018"/></svg>`},
+  {id:'whaleshark',name:'ジンベエザメ',sci:'Rhincodon typus',zone:'surface',rarity:'legendary',minD:0,maxD:700,
+   desc:'海最大の魚。穏やかな巨人で、点紋を散りばめた背を持つ。',
+   svg:`<svg viewBox="0 0 200 70" width="170" height="60"><path d="M10 35 Q40 12 100 18 L170 28 L195 35 L170 42 Q100 52 40 58 L10 35 Z" fill="#3a4a5a" stroke="#0a1a2a" stroke-width="1.2"/><circle cx="50" cy="30" r="2" fill="#fff" opacity=".7"/><circle cx="70" cy="26" r="2.5" fill="#fff" opacity=".7"/><circle cx="90" cy="32" r="2" fill="#fff" opacity=".7"/><circle cx="110" cy="28" r="2.5" fill="#fff" opacity=".7"/><circle cx="130" cy="34" r="2" fill="#fff" opacity=".7"/><circle cx="60" cy="42" r="2" fill="#fff" opacity=".7"/><circle cx="85" cy="46" r="2" fill="#fff" opacity=".7"/><circle cx="115" cy="44" r="2.5" fill="#fff" opacity=".7"/><circle cx="140" cy="42" r="2" fill="#fff" opacity=".7"/><circle cx="35" cy="32" r="2" fill="#1a1a1a"/><path d="M195 35 L210 25 L210 45 L195 38 Z" fill="#1a2a3a"/><path d="M115 18 Q120 4 130 12 Z M115 50 Q120 64 130 56 Z" fill="#2a3a4a" stroke="#0a1a2a"/></svg>`},
+  {id:'dolphin',name:'マイルカ',sci:'Delphinus delphis',zone:'surface',rarity:'rare',minD:0,maxD:300,
+   desc:'群をなして波を踊る賢き哺乳類。歌うように交信する。',
+   svg:`<svg viewBox="0 0 150 60" width="130" height="52"><path d="M10 35 Q30 18 70 25 L120 30 L140 38 L120 42 Q70 48 30 50 L10 35 Z" fill="#5a6a7a" stroke="#1a2a3a" stroke-width="1"/><path d="M75 25 Q88 8 95 28" fill="#3a4a5a" stroke="#1a2a3a" stroke-width="1"/><path d="M120 30 L138 22 L142 30 Z M120 42 L138 50 L142 38 Z" fill="#3a4a5a" stroke="#1a2a3a" stroke-width="1"/><path d="M30 38 Q75 42 130 38" stroke="#c8d0d8" stroke-width="1.2" fill="none" opacity=".6"/><circle cx="22" cy="32" r="2" fill="#1a1a1a"/><path d="M5 38 Q12 42 18 40" stroke="#1a2a3a" stroke-width="1" fill="none"/></svg>`},
+  {id:'mantisshrimp',name:'シャコ',sci:'Oratosquilla oratoria',zone:'surface',rarity:'uncommon',minD:5,maxD:200,
+   desc:'極めて強き拳を持つ。複眼に世界の十二色を見る。',
+   svg:`<svg viewBox="0 0 130 50" width="115" height="44"><path d="M15 25 Q22 12 40 12 L100 14 Q118 16 122 25 Q118 34 100 36 L40 38 Q22 38 15 25 Z" fill="#c87a5a" stroke="#4a1a08" stroke-width="1"/><path d="M30 14 L30 36 M42 14 L42 38 M55 14 L55 38 M68 14 L68 38 M80 14 L80 38 M92 14 L92 38 M104 14 L104 36" stroke="#4a1a08" stroke-width=".5"/><path d="M15 22 L4 14 L8 26 M15 28 L4 36 L8 24" stroke="#4a1a08" stroke-width="1.5" fill="#a85a40"/><circle cx="22" cy="20" r="2" fill="#1a0a0a"/><circle cx="22" cy="30" r="2" fill="#1a0a0a"/><path d="M122 25 L130 18 L130 32 Z" fill="#a85a40" stroke="#4a1a08"/></svg>`},
+
+  {id:'barracuda',name:'カマス',sci:'Sphyraena pinguis',zone:'surface',rarity:'common',minD:5,maxD:200,
+   desc:'鋭き歯と細長き銀の体。素早く獲物に襲いかかる狩人。',
+   svg:`<svg viewBox="0 0 160 35" width="135" height="32"><path d="M10 17 Q20 8 50 12 L150 16 L150 18 L50 22 Q20 26 10 17 Z" fill="#a0b0c0" stroke="#1a3a5a" stroke-width=".8"/><circle cx="22" cy="15" r="1.5" fill="#1a1a1a"/><path d="M22 20 L30 22 L36 18 L42 22 L48 18" stroke="#1a3a5a" stroke-width=".5" fill="none"/><path d="M150 16 L160 12 L160 22 Z" fill="#5a7a9a"/></svg>`},
+  {id:'filefish',name:'カワハギ',sci:'Stephanolepis cirrhifer',zone:'surface',rarity:'common',minD:5,maxD:100,
+   desc:'平べったい菱形の体に小さな口。皮を剥がれて食卓に上る。',
+   svg:`<svg viewBox="0 0 100 80" width="90" height="72"><path d="M15 40 Q30 12 60 12 L80 18 Q92 30 80 60 L60 68 Q30 68 15 40 Z" fill="#a89858" stroke="#3a2a08" stroke-width="1"/><path d="M60 12 L65 4 L70 12" stroke="#3a2a08" stroke-width="1" fill="#5a4a18"/><circle cx="30" cy="32" r="2" fill="#1a1a1a"/><circle cx="30" cy="32" r=".8" fill="#fff"/><path d="M22 38 Q26 42 32 40" stroke="#3a2a08" stroke-width=".6" fill="none"/><path d="M30 22 Q40 26 40 40 Q40 54 30 58" stroke="#7a6a38" stroke-width=".5" fill="none"/></svg>`},
+  {id:'striped',name:'イシダイ',sci:'Oplegnathus fasciatus',zone:'surface',rarity:'uncommon',minD:5,maxD:100,
+   desc:'七本の黒帯を持つ磯の王者。固き嘴で貝を砕く。',
+   svg:`<svg viewBox="0 0 110 60" width="95" height="52"><path d="M10 30 Q25 8 60 14 L92 24 L92 36 L60 46 Q25 52 10 30 Z" fill="#d8d0c0" stroke="#0a0a0a" stroke-width="1"/><path d="M28 14 L28 46 M40 12 L40 48 M52 10 L52 50 M64 12 L64 48 M76 16 L76 44 M82 20 L82 40" stroke="#0a0a0a" stroke-width="2"/><circle cx="78" cy="26" r="1.8" fill="#1a1a1a"/><path d="M92 24 L102 18 L102 42 L92 36 Z" fill="#a8a090" stroke="#0a0a0a"/></svg>`},
+  {id:'grouper',name:'ハタ',sci:'Epinephelus septemfasciatus',zone:'surface',rarity:'uncommon',minD:10,maxD:300,
+   desc:'岩礁に潜む大きな口の捕食者。斑模様の堂々たる体格。',
+   svg:`<svg viewBox="0 0 130 70" width="115" height="62"><path d="M10 35 Q28 10 70 16 L110 28 L110 42 L70 54 Q28 60 10 35 Z" fill="#7a5848" stroke="#2a1a0a" stroke-width="1"/><circle cx="30" cy="28" r="2.5" fill="#3a2a18" opacity=".7"/><circle cx="50" cy="40" r="2.5" fill="#3a2a18" opacity=".7"/><circle cx="70" cy="32" r="2.5" fill="#3a2a18" opacity=".7"/><circle cx="85" cy="44" r="2.5" fill="#3a2a18" opacity=".7"/><circle cx="55" cy="22" r="2.5" fill="#3a2a18" opacity=".7"/><circle cx="40" cy="48" r="2.5" fill="#3a2a18" opacity=".7"/><circle cx="80" cy="22" r="2.5" fill="#3a2a18" opacity=".7"/><circle cx="90" cy="32" r="2" fill="#1a1a1a"/><path d="M75 40 Q88 50 95 42" stroke="#2a1a0a" stroke-width="1" fill="none"/><path d="M110 28 L122 22 L122 48 L110 42 Z" fill="#5a3828" stroke="#2a1a0a"/></svg>`},
+  {id:'urchin',name:'ムラサキウニ',sci:'Heliocidaris crassispina',zone:'surface',rarity:'common',minD:5,maxD:100,
+   desc:'紫の刺をびっしりと纏う岩場の球体。',
+   svg:`<svg viewBox="0 0 100 100" width="80" height="80"><circle cx="50" cy="50" r="20" fill="#3a1a4a" stroke="#1a000a" stroke-width="1"/><path d="M50 30 L50 5 M50 30 L60 8 M50 30 L40 8 M50 30 L72 12 M50 30 L28 12 M70 50 L95 50 M70 50 L92 60 M70 50 L92 40 M50 70 L50 95 M50 70 L40 92 M50 70 L60 92 M30 50 L5 50 M30 50 L8 60 M30 50 L8 40 M64 36 L82 22 M36 36 L18 22 M64 64 L82 78 M36 64 L18 78 M70 38 L88 28 M30 38 L12 28 M70 62 L88 72 M30 62 L12 72" stroke="#5a2a6a" stroke-width="1.5"/></svg>`},
+  {id:'scallop',name:'ホタテガイ',sci:'Mizuhopecten yessoensis',zone:'surface',rarity:'common',minD:5,maxD:200,
+   desc:'扇状の殻を勢いよく開閉して水中を進む二枚貝。',
+   svg:`<svg viewBox="0 0 100 90" width="88" height="80"><path d="M50 8 L20 60 Q50 75 80 60 Z" fill="#e8d8a8" stroke="#5a3a08" stroke-width="1"/><path d="M50 8 L26 58 M50 8 L34 60 M50 8 L42 62 M50 8 L50 65 M50 8 L58 62 M50 8 L66 60 M50 8 L74 58" stroke="#5a3a08" stroke-width=".8"/><path d="M20 60 Q30 70 50 72 Q70 70 80 60" fill="none" stroke="#5a3a08" stroke-width="1"/></svg>`},
+  {id:'seaslug',name:'アオウミウシ',sci:'Hypselodoris festiva',zone:'surface',rarity:'uncommon',minD:5,maxD:50,
+   desc:'青き体に黄の縁飾り。海中の宝石とも呼ばれる軟体動物。',
+   svg:`<svg viewBox="0 0 110 50" width="95" height="44"><path d="M10 25 Q20 12 35 12 L80 14 Q100 18 100 25 Q100 32 80 36 L35 38 Q20 38 10 25 Z" fill="#3a6ac8" stroke="#0a1a4a" stroke-width="1"/><path d="M10 25 Q20 8 35 8 L80 10 Q100 16 100 25 Q100 34 80 40 L35 42 Q20 42 10 25" fill="none" stroke="#f2d04a" stroke-width="1.5"/><path d="M22 12 Q22 4 25 0 M30 11 Q30 3 33 -1" stroke="#f2d04a" stroke-width="1.5" fill="none"/><circle cx="20" cy="24" r="1.2" fill="#0a0a2a"/><path d="M70 12 Q72 6 78 5 Q72 12 70 12" fill="#f2d04a"/><path d="M75 12 Q77 6 83 5 Q77 12 75 12" fill="#f2d04a"/></svg>`},
+  {id:'manta',name:'オニイトマキエイ',sci:'Mobula birostris',zone:'surface',rarity:'rare',minD:0,maxD:1000,
+   desc:'翼を広げ七メートル。優雅に水中を舞う海の悪魔。',
+   svg:`<svg viewBox="0 0 180 80" width="155" height="70"><path d="M90 25 L160 15 Q175 35 170 50 L150 60 Q120 50 90 50 Q60 50 30 60 L10 50 Q5 35 20 15 L90 25 Z" fill="#1a2a3a" stroke="#000" stroke-width="1.2"/><path d="M75 25 L70 12 L80 22 Z M105 25 L110 12 L100 22 Z" fill="#3a4a5a" stroke="#000"/><circle cx="78" cy="32" r="1.5" fill="#fff"/><circle cx="102" cy="32" r="1.5" fill="#fff"/><path d="M170 50 L185 65 L170 60 Z" fill="#0a1a2a"/><path d="M30 60 Q60 65 90 60 Q120 65 150 60" stroke="#3a4a5a" stroke-width="1" fill="none" opacity=".6"/></svg>`},
+  {id:'humpback',name:'ザトウクジラ',sci:'Megaptera novaeangliae',zone:'surface',rarity:'legendary',minD:0,maxD:200,
+   desc:'歌う巨人。長き胸鰭を翼の如く広げ大海を旅する。',
+   svg:`<svg viewBox="0 0 240 80" width="200" height="68"><path d="M15 40 Q40 18 110 24 L200 36 L225 42 L200 48 Q110 56 40 60 L15 40 Z" fill="#1a2030" stroke="#000" stroke-width="1.2"/><path d="M225 42 L240 30 L240 54 L225 48 Z" fill="#0a0a1a"/><path d="M120 38 Q140 18 165 12 L155 30" fill="#2a3040" stroke="#000" stroke-width=".8"/><path d="M50 50 Q90 64 130 56" stroke="#c8d0d8" stroke-width="1.2" fill="none" opacity=".7"/><circle cx="40" cy="34" r="1.8" fill="#1a1a1a"/><path d="M22 40 Q35 44 40 42" stroke="#000" fill="none" stroke-width="1"/><path d="M28 30 L32 22 L36 30 M40 28 L42 20 L46 28" stroke="#3a4050" fill="none" stroke-width=".5"/></svg>`},
+  {id:'lobster',name:'イセエビ',sci:'Panulirus japonicus',zone:'surface',rarity:'uncommon',minD:5,maxD:150,
+   desc:'長き触角と棘の鎧を纏う。岩礁の王者と呼ばれる。',
+   svg:`<svg viewBox="0 0 160 70" width="140" height="62"><path d="M30 35 Q40 18 70 18 L120 22 Q140 28 145 35 L140 42 L120 48 L70 52 Q40 52 30 35 Z" fill="#a83020" stroke="#3a0a08" stroke-width="1"/><path d="M40 22 L40 48 M55 20 L55 50 M70 18 L70 52 M88 20 L88 50 M105 22 L105 48 M120 22 L120 48" stroke="#3a0a08" stroke-width=".5"/><path d="M30 35 L8 22 L4 12 M30 35 L4 32 M30 35 L8 48 L4 58 M30 35 L18 8 M30 35 L18 62" stroke="#3a0a08" stroke-width="1.2" fill="none" stroke-linecap="round"/><path d="M145 32 L155 25 L160 32 L155 40 L145 38 Z M145 38 L160 42 L160 50 L150 48 Z" fill="#8a1a0a" stroke="#3a0a08"/><circle cx="40" cy="30" r="1.2" fill="#1a0a0a"/><circle cx="40" cy="40" r="1.2" fill="#1a0a0a"/></svg>`},
+
+  // TWILIGHT
+  {id:'lantern',name:'ハダカイワシ',sci:'Myctophum affine',zone:'twilight',rarity:'common',minD:200,maxD:900,
+   desc:'腹に光点を灯し、闇の中を舞う。深海魚の代名詞。',
+   svg:`<svg viewBox="0 0 100 42" width="94" height="40"><path d="M10 21 Q28 8 70 14 L92 18 L70 26 Q28 34 10 21 Z" fill="#3a4a5a" stroke="#1a2a3a" stroke-width="1"/><circle cx="24" cy="28" r="1.5" fill="#7ae3ff"/><circle cx="36" cy="30" r="1.5" fill="#7ae3ff"/><circle cx="48" cy="30" r="1.5" fill="#7ae3ff"/><circle cx="60" cy="28" r="1.5" fill="#7ae3ff"/><circle cx="72" cy="26" r="1.5" fill="#7ae3ff"/><circle cx="78" cy="18" r="2" fill="#1a1a1a"/><circle cx="77" cy="17" r=".8" fill="#7ae3ff"/><path d="M10 21 L0 12 L0 30 Z" fill="#1a2a3a"/></svg>`},
+  {id:'viperfish',name:'ホウライエソ',sci:'Chauliodus sloani',zone:'twilight',rarity:'uncommon',minD:500,maxD:2500,
+   desc:'針のような長い牙と発光誘引子を持つ深海の刺客。',
+   svg:`<svg viewBox="0 0 120 50" width="110" height="46"><path d="M10 26 Q25 10 55 18 L100 22 L105 26 L100 30 Q25 42 10 26 Z" fill="#4a3a5a" stroke="#1a0a2a" stroke-width="1"/><path d="M100 22 L96 15 L93 20 M95 22 L90 17 L89 21 M102 30 L98 37 L95 32" stroke="#e8dcc4" stroke-width=".8" fill="#e8dcc4"/><circle cx="93" cy="25" r="2" fill="#1a1a1a"/><path d="M55 14 Q60 0 68 4 L64 14 Z" fill="#3a2a4a" stroke="#1a0a2a"/><circle cx="67" cy="6" r="1.5" fill="#7ae3ff"/><path d="M10 26 L0 16 L0 36 Z" fill="#2a1a3a"/></svg>`},
+  {id:'chimaera',name:'ギンザメ',sci:'Chimaera phantasma',zone:'twilight',rarity:'uncommon',minD:200,maxD:1500,
+   desc:'鮫とも魚ともつかぬ、生ける古代の亡霊。',
+   svg:`<svg viewBox="0 0 130 50" width="115" height="46"><path d="M10 25 Q30 8 70 15 L110 22 L118 25 L110 28 Q30 42 10 25 Z" fill="#8a9aaa" stroke="#2a3a4a" stroke-width="1"/><path d="M50 8 Q60 0 75 6 L72 14" fill="#6a7a8a" stroke="#2a3a4a" stroke-width="1"/><circle cx="100" cy="20" r="2" fill="#1a1a1a"/><circle cx="100" cy="20" r=".8" fill="#d8e8f0"/><path d="M110 22 L124 16 L120 25 L124 34 L110 28 Z" fill="#6a7a8a" stroke="#2a3a4a"/><path d="M10 25 L-2 14 L-2 36 Z" fill="#5a6a7a"/></svg>`},
+  {id:'barreleye',name:'デメニギス',sci:'Macropinna microstoma',zone:'twilight',rarity:'rare',minD:400,maxD:800,
+   desc:'透明な頭部に緑の目玉。真上を見上げる奇怪なる探訪者。',
+   svg:`<svg viewBox="0 0 110 55" width="100" height="50"><path d="M15 30 Q40 15 80 20 L100 30 L80 40 Q40 45 15 30 Z" fill="#3a4a5a" stroke="#1a2a3a" stroke-width="1"/><ellipse cx="70" cy="22" rx="22" ry="14" fill="rgba(180,220,240,.35)" stroke="rgba(180,220,240,.6)" stroke-width="1"/><circle cx="62" cy="20" r="5" fill="#4aff4a" opacity=".9"/><circle cx="62" cy="20" r="2" fill="#0a2a0a"/><circle cx="78" cy="20" r="5" fill="#4aff4a" opacity=".9"/><circle cx="78" cy="20" r="2" fill="#0a2a0a"/><path d="M15 30 L4 20 L4 40 Z" fill="#2a3a4a"/></svg>`},
+  {id:'oarfish',name:'リュウグウノツカイ',sci:'Regalecus glesne',zone:'twilight',rarity:'legendary',minD:200,maxD:1000,
+   desc:'銀色の長大な姿、朱き鬣を持つ。竜宮の使者と称えられる。',
+   svg:`<svg viewBox="0 0 200 50" width="170" height="42"><path d="M5 25 L185 22 L195 25 L185 28 L5 25 Z" fill="#c8d8e0" stroke="#3a4a5a" stroke-width="1"/><path d="M15 22 L18 8 M35 22 L37 6 M55 22 L58 10 M75 22 L77 5 M95 22 L98 9 M115 22 L117 7 M135 22 L138 10 M155 22 L158 6 M175 22 L177 12" stroke="#d84a4a" stroke-width="1.5"/><path d="M178 22 Q192 14 195 25 Q192 36 178 28 Z" fill="#d84a4a" stroke="#5a1a1a" stroke-width=".8"/><circle cx="182" cy="24" r="1.5" fill="#1a1a1a"/></svg>`},
+  {id:'squid_sm',name:'スルメイカ',sci:'Todarodes pacificus',zone:'twilight',rarity:'common',minD:100,maxD:500,
+   desc:'流線形の体、素早い反撃の墨を吐く。',
+   svg:`<svg viewBox="0 0 90 90" width="80" height="80"><path d="M45 8 Q62 28 48 50 Q30 28 45 8 Z" fill="#d8a8a0" stroke="#5a2a20" stroke-width="1"/><path d="M38 45 Q28 70 24 85 M42 48 Q36 70 32 85 M45 50 Q45 72 42 85 M48 48 Q54 70 58 85 M52 45 Q62 70 66 85" stroke="#b8887a" stroke-width="1.5" fill="none"/><ellipse cx="40" cy="30" rx="2.5" ry="3.5" fill="#1a0a0a"/><ellipse cx="50" cy="30" rx="2.5" ry="3.5" fill="#1a0a0a"/><path d="M35 15 L42 2 L48 15 Z" fill="#b8887a" opacity=".6"/></svg>`},
+  {id:'spidercrab',name:'タカアシガニ',sci:'Macrocheira kaempferi',zone:'twilight',rarity:'rare',minD:150,maxD:800,
+   desc:'長き脚を広げれば四メートルにも達する世界最大の節足動物。',
+   svg:`<svg viewBox="0 0 160 130" width="140" height="115"><ellipse cx="80" cy="70" rx="22" ry="18" fill="#a85040" stroke="#3a0a08" stroke-width="1.2"/><path d="M65 65 Q35 35 10 18 M70 60 Q40 25 18 8 M75 58 Q50 22 50 4 M85 58 Q90 22 95 4 M90 60 Q120 25 142 8 M95 65 Q125 35 150 18 M65 75 Q35 95 10 115 M70 80 Q40 105 18 125 M75 82 Q50 110 50 128 M85 82 Q90 110 95 128 M90 80 Q120 105 142 125 M95 75 Q125 95 150 115" stroke="#3a0a08" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="74" cy="66" r="1.5" fill="#1a1a1a"/><circle cx="86" cy="66" r="1.5" fill="#1a1a1a"/></svg>`},
+  {id:'flashlightfish',name:'ヒカリキンメダイ',sci:'Anomalops katoptron',zone:'twilight',rarity:'uncommon',minD:200,maxD:800,
+   desc:'目の下に発光器官を持つ。バクテリアと共生して輝く。',
+   svg:`<svg viewBox="0 0 100 50" width="90" height="44"><path d="M10 25 Q25 8 65 14 L92 22 L65 32 Q25 40 10 25 Z" fill="#1a2a3a" stroke="#000" stroke-width="1"/><circle cx="72" cy="20" r="3" fill="#1a1a1a"/><ellipse cx="72" cy="26" rx="6" ry="3" fill="#7ae3ff"/><ellipse cx="72" cy="26" rx="9" ry="5" fill="#7ae3ff" opacity=".4"/><path d="M92 22 L102 16 L102 32 L92 28 Z" fill="#0a1a2a"/><path d="M10 25 L0 14 L0 36 Z" fill="#0a1a2a"/></svg>`},
+  {id:'hatchetfish',name:'ハチェットフィッシュ',sci:'Argyropelecus aculeatus',zone:'twilight',rarity:'uncommon',minD:200,maxD:1500,
+   desc:'銀色の斧のような奇妙な形。腹部に光点が並ぶ。',
+   svg:`<svg viewBox="0 0 80 70" width="72" height="62"><path d="M10 25 Q20 8 38 8 L60 14 Q72 22 70 35 L60 48 Q40 60 25 55 Q10 45 10 25 Z" fill="#c8c8d8" stroke="#1a2a3a" stroke-width="1"/><circle cx="56" cy="22" r="3.5" fill="#1a1a1a"/><circle cx="56" cy="22" r="1.5" fill="#fff"/><circle cx="20" cy="48" r="1.5" fill="#7ae3ff"/><circle cx="32" cy="52" r="1.5" fill="#7ae3ff"/><circle cx="44" cy="52" r="1.5" fill="#7ae3ff"/><circle cx="56" cy="48" r="1.5" fill="#7ae3ff"/><path d="M70 35 L80 30 L80 40 Z" fill="#7a8a9a"/></svg>`},
+  {id:'fireflysquid',name:'ホタルイカ',sci:'Watasenia scintillans',zone:'twilight',rarity:'common',minD:200,maxD:600,
+   desc:'富山湾の春の風物詩。全身に青き光を散らす小さな烏賊。',
+   svg:`<svg viewBox="0 0 70 100" width="60" height="86"><path d="M35 8 Q52 25 38 50 Q22 25 35 8 Z" fill="#3a3a5a" stroke="#0a0a1a" stroke-width="1"/><circle cx="28" cy="22" r="1.5" fill="#7ae3ff"/><circle cx="42" cy="22" r="1.5" fill="#7ae3ff"/><circle cx="35" cy="35" r="1.5" fill="#7ae3ff"/><circle cx="25" cy="40" r="1.5" fill="#7ae3ff"/><circle cx="45" cy="40" r="1.5" fill="#7ae3ff"/><ellipse cx="32" cy="28" rx="1.5" ry="2" fill="#fff"/><ellipse cx="38" cy="28" rx="1.5" ry="2" fill="#fff"/><path d="M28 48 Q22 75 18 95 M32 50 Q28 78 25 96 M35 50 Q35 80 33 96 M38 50 Q42 78 45 96 M42 48 Q48 75 52 95" stroke="#5a5a7a" stroke-width="1.2" fill="none"/><circle cx="22" cy="80" r="1.2" fill="#7ae3ff"/><circle cx="32" cy="85" r="1.2" fill="#7ae3ff"/><circle cx="48" cy="80" r="1.2" fill="#7ae3ff"/></svg>`},
+  {id:'rockfish',name:'アコウダイ',sci:'Sebastes matsubarae',zone:'twilight',rarity:'common',minD:300,maxD:700,
+   desc:'真紅の体色を持つ深海の高級魚。長寿で知られる。',
+   svg:`<svg viewBox="0 0 110 60" width="95" height="52"><path d="M10 30 Q28 8 65 16 L95 24 L95 36 L65 44 Q28 52 10 30 Z" fill="#c84a3a" stroke="#5a0a0a" stroke-width="1"/><path d="M30 18 L34 8 L40 18 M48 16 L52 4 L58 16 M62 18 L68 6 L74 18" fill="#a82a1a" stroke="#5a0a0a" stroke-width=".8"/><circle cx="72" cy="26" r="2.5" fill="#1a0a0a"/><circle cx="72" cy="26" r="1" fill="#fff"/><path d="M95 24 L108 18 L108 42 L95 36 Z" fill="#a82a1a" stroke="#5a0a0a"/></svg>`},
+  {id:'opah',name:'アカマンボウ',sci:'Lampris guttatus',zone:'twilight',rarity:'rare',minD:50,maxD:500,
+   desc:'円盤のような体に銀の点紋。世界で唯一の温血魚。',
+   svg:`<svg viewBox="0 0 100 90" width="90" height="82"><ellipse cx="50" cy="45" rx="40" ry="38" fill="#c84a4a" stroke="#5a0a0a" stroke-width="1.2"/><path d="M50 7 Q60 2 58 18 L50 18 Z" fill="#8a1a1a" stroke="#5a0a0a"/><path d="M50 83 Q60 88 58 72 L50 72 Z" fill="#8a1a1a" stroke="#5a0a0a"/><path d="M88 45 Q100 38 98 50 Q100 56 88 50 Z" fill="#8a1a1a" stroke="#5a0a0a"/><circle cx="22" cy="40" r="3" fill="#1a0a0a"/><circle cx="22" cy="40" r="1.2" fill="#fff"/><path d="M10 48 Q18 52 26 50" stroke="#5a0a0a" fill="none" stroke-width="1.2"/><circle cx="40" cy="32" r="1.5" fill="#fff" opacity=".7"/><circle cx="55" cy="40" r="1.5" fill="#fff" opacity=".7"/><circle cx="65" cy="55" r="1.5" fill="#fff" opacity=".7"/><circle cx="48" cy="60" r="1.5" fill="#fff" opacity=".7"/><circle cx="35" cy="55" r="1.5" fill="#fff" opacity=".7"/></svg>`},
+  {id:'hagfish',name:'ヌタウナギ',sci:'Eptatretus burgeri',zone:'twilight',rarity:'common',minD:400,maxD:1500,
+   desc:'粘液を放出して敵を撹乱する原始的な無顎類。',
+   svg:`<svg viewBox="0 0 160 30" width="140" height="26"><path d="M5 15 Q15 10 30 13 L155 14 L155 16 L30 17 Q15 20 5 15 Z" fill="#a08a78" stroke="#3a2a1a" stroke-width="1"/><circle cx="20" cy="14" r="1.5" fill="#1a1a1a"/><path d="M14 18 Q22 22 28 19" stroke="#3a2a1a" stroke-width=".8" fill="none"/><circle cx="14" cy="13" r=".8" fill="#1a1a1a"/><circle cx="18" cy="11" r=".8" fill="#1a1a1a"/><path d="M50 12 Q60 10 70 12 M90 12 Q100 10 110 12 M130 12 Q140 10 150 12" stroke="#7a6a58" stroke-width=".5" fill="none"/></svg>`},
+  {id:'cookiecutter',name:'ダルマザメ',sci:'Isistius brasiliensis',zone:'twilight',rarity:'uncommon',minD:200,maxD:1500,
+   desc:'円形に肉を抉り取る奇妙な小型の鮫。腹部に光を持つ。',
+   svg:`<svg viewBox="0 0 130 40" width="115" height="36"><path d="M10 20 Q25 8 60 14 L110 18 L120 22 L110 26 Q25 32 10 20 Z" fill="#3a2a3a" stroke="#0a000a" stroke-width="1"/><path d="M10 22 Q40 28 70 24 L110 26" stroke="#7ae3ff" stroke-width="1" fill="none" opacity=".7"/><circle cx="105" cy="20" r="1.5" fill="#a9ff7e"/><circle cx="60" cy="14" r="1" fill="#7ae3ff"/><circle cx="80" cy="16" r="1" fill="#7ae3ff"/><circle cx="100" cy="18" r="1" fill="#7ae3ff"/><path d="M120 22 L130 18 L130 26 Z" fill="#1a0a1a"/></svg>`},
+  {id:'eelpout',name:'クロカジカ',sci:'Lycodes',zone:'twilight',rarity:'common',minD:200,maxD:2000,
+   desc:'うなぎのように細長い深海魚。冷たき水を好む。',
+   svg:`<svg viewBox="0 0 150 30" width="130" height="26"><path d="M10 15 Q25 5 50 11 L140 14 L145 15 L140 16 L50 19 Q25 25 10 15 Z" fill="#3a3a4a" stroke="#0a0a1a" stroke-width="1"/><circle cx="20" cy="13" r="1.5" fill="#fff"/><circle cx="20" cy="13" r=".8" fill="#000"/><path d="M30 9 L30 21 M40 8 L40 22 M50 9 L50 21" stroke="#0a0a1a" stroke-width=".5"/></svg>`},
+  {id:'krill',name:'ナンキョクオキアミ',sci:'Euphausia superba',zone:'twilight',rarity:'common',minD:0,maxD:500,
+   desc:'海洋食物連鎖の柱。鯨さえ養う紅き群体。',
+   svg:`<svg viewBox="0 0 80 30" width="68" height="26"><path d="M8 15 Q15 8 25 10 L60 14 Q70 16 72 22 L60 24 L25 22 Q15 22 8 15 Z" fill="#e08070" stroke="#5a1a0a" stroke-width=".8"/><path d="M28 12 L28 22 M35 11 L35 22 M42 11 L42 22 M49 12 L49 22 M56 13 L56 22" stroke="#5a1a0a" stroke-width=".4"/><circle cx="18" cy="13" r="1.2" fill="#1a1a1a"/><circle cx="18" cy="17" r="1.2" fill="#1a1a1a"/><path d="M8 13 L2 8 M8 17 L2 22" stroke="#5a1a0a" stroke-width=".8"/><path d="M72 22 L78 18 L78 26 Z" fill="#a8503a" stroke="#5a1a0a" stroke-width=".5"/></svg>`},
+
+  {id:'kinmedai',name:'キンメダイ',sci:'Beryx splendens',zone:'twilight',rarity:'uncommon',minD:200,maxD:800,
+   desc:'真紅の体と巨大な金色の眼。深海の宝石と称される。',
+   svg:`<svg viewBox="0 0 110 60" width="95" height="52"><path d="M10 30 Q25 8 60 14 L92 22 L92 38 L60 46 Q25 52 10 30 Z" fill="#d83a2a" stroke="#5a0a0a" stroke-width="1"/><circle cx="35" cy="25" r="6" fill="#f2d04a"/><circle cx="35" cy="25" r="3" fill="#1a1a1a"/><circle cx="36" cy="23" r=".8" fill="#fff"/><path d="M55 14 L60 6 L66 16 M70 16 L74 8 L80 18" fill="#a82a1a" stroke="#5a0a0a" stroke-width=".8"/><path d="M92 22 L105 16 L105 44 L92 38 Z" fill="#a82a1a" stroke="#5a0a0a"/></svg>`},
+  {id:'monkfish',name:'アンコウ',sci:'Lophius litulon',zone:'twilight',rarity:'uncommon',minD:30,maxD:800,
+   desc:'平らな体の捕食者。頭の突起で獲物を誘い出す。',
+   svg:`<svg viewBox="0 0 130 80" width="115" height="72"><path d="M10 50 Q30 18 65 22 L100 30 Q120 38 122 50 L100 60 Q65 68 30 65 L10 50 Z" fill="#5a4a3a" stroke="#1a0a08" stroke-width="1"/><path d="M50 22 Q48 8 56 4 L60 10 Z" fill="#3a2a18" stroke="#1a0a08"/><circle cx="60" cy="10" r="1.5" fill="#a9ff7e"/><circle cx="60" cy="10" r="3" fill="#a9ff7e" opacity=".4"/><path d="M30 45 L34 55 L40 45 M48 50 L52 60 L58 50 M65 45 L70 55 L75 45" stroke="#1a0a08" stroke-width=".6" fill="#fff"/><circle cx="80" cy="32" r="2" fill="#1a1a1a"/></svg>`},
+  {id:'snowcrab',name:'ベニズワイガニ',sci:'Chionoecetes japonicus',zone:'twilight',rarity:'uncommon',minD:400,maxD:2700,
+   desc:'長き脚を持つ深海の朱き蟹。冷たき水を好む高級な味。',
+   svg:`<svg viewBox="0 0 150 110" width="130" height="95"><ellipse cx="75" cy="55" rx="22" ry="16" fill="#d83a2a" stroke="#5a0a0a" stroke-width="1.2"/><path d="M62 50 Q35 30 8 18 M62 55 Q30 45 4 50 M62 60 Q35 80 8 100 M88 50 Q115 30 142 18 M88 55 Q120 45 146 50 M88 60 Q115 80 142 100 M68 45 Q60 22 50 8 M82 45 Q90 22 100 8" stroke="#5a0a0a" stroke-width="1.5" fill="none" stroke-linecap="round"/><circle cx="70" cy="52" r="1.2" fill="#0a000a"/><circle cx="80" cy="52" r="1.2" fill="#0a000a"/></svg>`},
+  {id:'stingray',name:'アカエイ',sci:'Hemitrygon akajei',zone:'twilight',rarity:'uncommon',minD:50,maxD:600,
+   desc:'平たい菱形の体と毒針の尾。砂に身を潜める。',
+   svg:`<svg viewBox="0 0 160 100" width="140" height="88"><path d="M80 20 Q130 30 145 60 Q130 70 100 65 L80 50 L60 65 Q30 70 15 60 Q30 30 80 20 Z" fill="#8a6a4a" stroke="#2a1a08" stroke-width="1.2"/><circle cx="68" cy="38" r="1.5" fill="#1a1a1a"/><circle cx="92" cy="38" r="1.5" fill="#1a1a1a"/><path d="M80 50 Q85 70 90 100 M82 55 L84 100" stroke="#5a3a08" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M88 92 L86 98 L90 96" fill="#3a2a08" stroke="#1a0a08"/></svg>`},
+  {id:'grenadier',name:'ヒゲダラ',sci:'Coryphaenoides',zone:'twilight',rarity:'common',minD:400,maxD:5000,
+   desc:'長き尾を引く。深海で最も多く見られる住人の一つ。',
+   svg:`<svg viewBox="0 0 200 50" width="170" height="44"><path d="M10 25 Q22 8 50 14 L190 22 L195 25 L190 28 L50 36 Q22 42 10 25 Z" fill="#7a6a5a" stroke="#1a0a0a" stroke-width="1"/><circle cx="22" cy="22" r="1.8" fill="#1a1a1a"/><path d="M22 28 L28 32 L24 36" stroke="#1a0a0a" stroke-width=".5" fill="none"/><path d="M50 14 L55 4 L60 16 M60 36 L60 46 L65 38" fill="#5a4a3a" stroke="#1a0a0a" stroke-width=".5"/></svg>`},
+  {id:'menuke',name:'メヌケ',sci:'Sebastes alutus',zone:'twilight',rarity:'common',minD:200,maxD:1000,
+   desc:'橙色の体と大きな目。岩礁の崖に身を潜める。',
+   svg:`<svg viewBox="0 0 110 55" width="95" height="48"><path d="M10 28 Q25 8 60 14 L95 22 L95 34 L60 42 Q25 48 10 28 Z" fill="#e88a3a" stroke="#5a2a0a" stroke-width="1"/><path d="M30 14 L35 4 L42 16 M48 12 L52 2 L58 14" fill="#a86a1a" stroke="#5a2a0a" stroke-width=".6"/><circle cx="32" cy="22" r="3.5" fill="#1a1a1a"/><circle cx="32" cy="22" r="1.5" fill="#fff"/><path d="M95 22 L106 16 L106 40 L95 34 Z" fill="#a86a1a" stroke="#5a2a0a"/></svg>`},
+  {id:'stargazer',name:'ミシマオコゼ',sci:'Uranoscopus japonicus',zone:'twilight',rarity:'rare',minD:100,maxD:400,
+   desc:'砂に潜み天を仰ぐ。電気を発する珍しき魚。',
+   svg:`<svg viewBox="0 0 110 70" width="95" height="62"><path d="M10 50 Q20 25 55 22 L90 28 Q105 36 105 50 L80 58 Q20 60 10 50 Z" fill="#5a4828" stroke="#1a0a08" stroke-width="1"/><circle cx="38" cy="32" r="2.5" fill="#1a1a1a"/><circle cx="38" cy="32" r=".8" fill="#fff"/><circle cx="58" cy="32" r="2.5" fill="#1a1a1a"/><circle cx="58" cy="32" r=".8" fill="#fff"/><path d="M30 50 Q50 56 70 50" stroke="#1a0a08" stroke-width="1.5" fill="none"/><path d="M32 50 L34 53 M40 52 L42 55 M48 52 L50 55 M56 52 L58 55 M64 50 L66 53" stroke="#fff" stroke-width=".4"/></svg>`},
+  {id:'bathylagus',name:'セキトリイワシ',sci:'Bathylagus',zone:'twilight',rarity:'common',minD:300,maxD:1500,
+   desc:'銀色の小さな深海の鰯。群れをなして暮らす。',
+   svg:`<svg viewBox="0 0 90 30" width="78" height="26"><path d="M8 15 Q18 5 35 9 L80 14 L80 16 L35 21 Q18 25 8 15 Z" fill="#c8c8d0" stroke="#1a2a3a" stroke-width=".8"/><circle cx="22" cy="13" r="2" fill="#1a1a1a"/><circle cx="22" cy="13" r="1" fill="#fff"/><path d="M80 14 L88 10 L88 20 L80 16 Z" fill="#7a8a9a"/></svg>`},
+
+  // MIDNIGHT
+  {id:'anglerfish',name:'チョウチンアンコウ',sci:'Himantolophus sp.',zone:'midnight',rarity:'uncommon',minD:1000,maxD:3500,
+   desc:'額の提灯で獲物を誘う、暗黒層の象徴。',
+   svg:`<svg viewBox="0 0 110 90" width="100" height="82"><path d="M10 50 Q25 20 60 25 Q85 30 95 50 Q85 70 60 75 Q25 80 10 50 Z" fill="#2a1a2a" stroke="#0a000a" stroke-width="1.2"/><path d="M55 25 Q52 5 38 3" stroke="#0a000a" stroke-width="1.5" fill="none"/><circle cx="36" cy="3" r="5" fill="#e4b857"/><circle cx="36" cy="3" r="8" fill="#f2d04a" opacity=".3"/><path d="M30 55 L40 48 L32 50 L42 45 L34 52 L44 48 M50 60 L60 52 L52 56 L62 50" stroke="#f2d04a" stroke-width="1" fill="none"/><circle cx="58" cy="40" r="2.5" fill="#f2d04a"/><circle cx="58" cy="40" r="1" fill="#000"/><path d="M20 58 Q30 68 40 62 Q32 65 24 62" fill="#f2d04a"/></svg>`},
+  {id:'gulpereel',name:'フクロウナギ',sci:'Eurypharynx pelecanoides',zone:'midnight',rarity:'rare',minD:1500,maxD:4000,
+   desc:'体の半分が口。まるで黒い袋のような不気味な獵師。',
+   svg:`<svg viewBox="0 0 180 60" width="160" height="54"><path d="M10 30 L55 20 Q70 18 80 25 L175 28 L175 32 L80 35 Q70 42 55 40 L10 30 Z" fill="#1a0a1a" stroke="#000" stroke-width="1"/><path d="M55 20 Q68 10 80 25 L55 40 Q68 50 80 35" fill="#3a1a3a" stroke="#000" stroke-width="1"/><circle cx="60" cy="28" r="1.5" fill="#f2d04a"/><circle cx="170" cy="30" r="3" fill="#f2d04a" opacity=".8"/><circle cx="170" cy="30" r="5" fill="#f2d04a" opacity=".3"/></svg>`},
+  {id:'vampsquid',name:'コウモリダコ',sci:'Vampyroteuthis infernalis',zone:'midnight',rarity:'rare',minD:600,maxD:2500,
+   desc:'地獄の吸血鬼と名付けられしも、実は温和な海の隠者。',
+   svg:`<svg viewBox="0 0 100 100" width="90" height="90"><path d="M50 10 Q80 25 70 55 Q85 50 80 70 Q70 85 50 75 Q30 85 20 70 Q15 50 30 55 Q20 25 50 10 Z" fill="#4a0a2a" stroke="#1a0008" stroke-width="1.2"/><circle cx="40" cy="35" r="4" fill="#7ae3ff" opacity=".9"/><circle cx="60" cy="35" r="4" fill="#7ae3ff" opacity=".9"/><circle cx="40" cy="35" r="1.5" fill="#000"/><circle cx="60" cy="35" r="1.5" fill="#000"/><path d="M35 70 Q30 88 28 95 M45 75 Q42 90 40 96 M55 75 Q58 90 60 96 M65 70 Q70 88 72 95" stroke="#2a0518" stroke-width="1.5" fill="none"/></svg>`},
+  {id:'goblinshark',name:'ミツクリザメ',sci:'Mitsukurina owstoni',zone:'midnight',rarity:'rare',minD:800,maxD:3000,
+   desc:'突き出た鼻と飛び出す顎を持つ、現存する太古の鮫。',
+   svg:`<svg viewBox="0 0 170 55" width="150" height="48"><path d="M10 28 Q30 14 70 20 L130 22 L160 26 L130 32 L70 34 Q30 40 10 28 Z" fill="#d8bfc8" stroke="#5a2a3a" stroke-width="1"/><path d="M130 22 L158 18 L160 26 L158 34 L130 32" fill="#d8bfc8" stroke="#5a2a3a" stroke-width="1"/><path d="M135 24 L155 23 L155 28 L135 29 Z" fill="#fff" stroke="#5a2a3a" stroke-width=".6"/><path d="M138 24 L140 28 M143 24 L145 28 M148 24 L150 28" stroke="#5a2a3a" stroke-width=".6"/><circle cx="115" cy="23" r="1.5" fill="#1a1a1a"/><path d="M60 12 L68 2 L70 16 Z" fill="#b89fa8" stroke="#5a2a3a"/><path d="M10 28 L-2 14 L-2 42 Z" fill="#a88898"/></svg>`},
+  {id:'giantsquid',name:'ダイオウイカ',sci:'Architeuthis dux',zone:'midnight',rarity:'legendary',minD:500,maxD:3000,
+   desc:'船を襲うとされる伝説の巨大烏賊。直径の目玉は30センチに及ぶ。',
+   svg:`<svg viewBox="0 0 140 150" width="120" height="130"><path d="M70 10 Q100 40 80 80 Q55 40 70 10 Z" fill="#b8385a" stroke="#4a0a18" stroke-width="1.5"/><ellipse cx="58" cy="55" rx="6" ry="8" fill="#f0e8d0"/><ellipse cx="82" cy="55" rx="6" ry="8" fill="#f0e8d0"/><circle cx="58" cy="55" r="3" fill="#000"/><circle cx="82" cy="55" r="3" fill="#000"/><path d="M55 75 Q30 110 15 145 M62 78 Q48 115 38 148 M70 80 Q70 118 68 148 M78 78 Q92 115 102 148 M85 75 Q110 110 125 145 M60 76 Q25 90 8 110 M80 76 Q115 90 132 110" stroke="#9a2a48" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M55 18 L70 2 L85 18 Z" fill="#9a2a48" opacity=".7"/></svg>`},
+  {id:'blackswallower',name:'ブラックスワロワー',sci:'Chiasmodon niger',zone:'midnight',rarity:'rare',minD:700,maxD:2700,
+   desc:'自分より大きな獲物を丸呑みにする貪婪なる漆黒の魚。',
+   svg:`<svg viewBox="0 0 130 70" width="115" height="62"><path d="M10 35 Q20 15 45 18 L70 22 Q95 30 100 38 Q95 45 70 50 L45 55 Q20 55 10 35 Z" fill="#0a000a" stroke="#000" stroke-width="1.2"/><ellipse cx="65" cy="38" rx="18" ry="12" fill="#3a1a1a" stroke="#000" stroke-width="1"/><circle cx="60" cy="34" r="1.5" fill="#f2d04a"/><path d="M40 25 L52 18 M42 50 L54 56" stroke="#2a0a2a" stroke-width=".6"/><circle cx="22" cy="32" r="1.5" fill="#fff"/><circle cx="22" cy="32" r=".8" fill="#000"/><path d="M100 38 L110 32 L110 44 Z" fill="#1a0a1a"/></svg>`},
+  {id:'loosejaw',name:'ストップライトルーズジョー',sci:'Malacosteus niger',zone:'midnight',rarity:'rare',minD:500,maxD:3000,
+   desc:'赤い光を発する稀有な魚。獲物に気付かれず狩る。',
+   svg:`<svg viewBox="0 0 140 50" width="120" height="44"><path d="M10 25 Q25 8 60 14 L120 22 L120 28 L60 36 Q25 42 10 25 Z" fill="#0a0a1a" stroke="#000" stroke-width="1"/><circle cx="100" cy="22" r="3" fill="#ff4040"/><circle cx="100" cy="22" r="5" fill="#ff4040" opacity=".4"/><circle cx="100" cy="22" r="1" fill="#fff"/><circle cx="115" cy="20" r="1.5" fill="#7ae3ff"/><circle cx="115" cy="20" r="3" fill="#7ae3ff" opacity=".3"/><path d="M60 14 L70 4 L78 14 M60 36 L70 46 L78 36" fill="#1a1a2a" stroke="#000" stroke-width=".8"/><path d="M70 18 L74 24 M80 18 L83 24 M88 20 L90 25" stroke="#fff" stroke-width=".6"/></svg>`},
+  {id:'lancetfish',name:'ナガヅエエソ',sci:'Alepisaurus ferox',zone:'midnight',rarity:'uncommon',minD:600,maxD:2000,
+   desc:'帆のような巨大な背鰭と鋭き歯。深海の貪欲なる狩人。',
+   svg:`<svg viewBox="0 0 180 60" width="155" height="52"><path d="M10 35 Q30 20 70 25 L155 30 L170 35 L155 40 Q30 45 10 35 Z" fill="#3a4858" stroke="#0a1018" stroke-width="1"/><path d="M40 25 L60 4 L80 22 L100 8 L120 26 L140 12 L150 28 Z" fill="#5a6878" stroke="#0a1018" stroke-width="1"/><circle cx="22" cy="32" r="1.8" fill="#1a1a1a"/><path d="M20 38 L24 42 M26 38 L28 42 M32 39 L34 43" stroke="#fff" stroke-width=".5"/><path d="M170 35 L180 28 L180 42 L170 38 Z" fill="#1a2030"/></svg>`},
+  {id:'fangtooth',name:'キバアンコウ',sci:'Anoplogaster cornuta',zone:'midnight',rarity:'rare',minD:500,maxD:5000,
+   desc:'体長に比して巨大な牙を持つ。海中で最も恐ろしき表情。',
+   svg:`<svg viewBox="0 0 100 80" width="88" height="72"><path d="M10 40 Q20 18 45 18 Q70 20 85 35 L92 40 L85 45 Q70 60 45 60 Q20 60 10 40 Z" fill="#1a0a0a" stroke="#000" stroke-width="1.2"/><path d="M30 35 L32 48 L36 35 M40 35 L42 50 L46 35 M50 35 L52 50 L56 35 M60 35 L62 48 L66 35" fill="#fff" stroke="#000" stroke-width=".5"/><path d="M30 48 L32 35 L36 48 M40 50 L42 35 L46 50 M50 50 L52 35 L56 50 M60 48 L62 35 L66 48" fill="#fff" stroke="#000" stroke-width=".5"/><circle cx="22" cy="35" r="2" fill="#fff"/><circle cx="22" cy="35" r="1" fill="#000"/></svg>`},
+  {id:'deepjelly',name:'クロクラゲ',sci:'Atolla wyvillei',zone:'midnight',rarity:'common',minD:1000,maxD:5000,
+   desc:'危険時に青く点滅する光の輪を放つ。深海の警報器。',
+   svg:`<svg viewBox="0 0 100 100" width="88" height="88"><ellipse cx="50" cy="35" rx="40" ry="22" fill="rgba(180,40,80,.6)" stroke="#7a0028" stroke-width="1"/><ellipse cx="50" cy="35" rx="32" ry="16" fill="none" stroke="#7ae3ff" stroke-width="1.2"/><ellipse cx="50" cy="35" rx="24" ry="10" fill="none" stroke="#7ae3ff" stroke-width="1" opacity=".6"/><path d="M14 42 Q14 70 8 95 M28 50 Q26 75 22 95 M42 52 Q42 80 40 95 M58 52 Q58 80 60 95 M72 50 Q74 75 78 95 M86 42 Q86 70 92 95" stroke="rgba(180,40,80,.7)" stroke-width="1.5" fill="none"/></svg>`},
+  {id:'pyrosome',name:'ヒカリボヤ',sci:'Pyrosoma',zone:'midnight',rarity:'uncommon',minD:300,maxD:2000,
+   desc:'数千の個体が集まり一つの管となる発光する群体生物。',
+   svg:`<svg viewBox="0 0 130 50" width="115" height="44"><defs><radialGradient id="pyroG"><stop offset="0" stop-color="#a9ff7e" stop-opacity=".7"/><stop offset="1" stop-color="#a9ff7e" stop-opacity="0"/></radialGradient></defs><ellipse cx="65" cy="25" rx="60" ry="22" fill="url(#pyroG)"/><path d="M10 25 Q15 10 35 12 L100 14 Q120 16 122 25 Q120 34 100 36 L35 38 Q15 40 10 25 Z" fill="#5a8a3a" stroke="#1a3a0a" stroke-width="1" opacity=".85"/><circle cx="25" cy="22" r="1.5" fill="#a9ff7e"/><circle cx="40" cy="20" r="1.5" fill="#a9ff7e"/><circle cx="55" cy="22" r="1.5" fill="#a9ff7e"/><circle cx="70" cy="20" r="1.5" fill="#a9ff7e"/><circle cx="85" cy="22" r="1.5" fill="#a9ff7e"/><circle cx="100" cy="20" r="1.5" fill="#a9ff7e"/><circle cx="30" cy="30" r="1.2" fill="#a9ff7e"/><circle cx="50" cy="32" r="1.2" fill="#a9ff7e"/><circle cx="75" cy="30" r="1.2" fill="#a9ff7e"/><circle cx="95" cy="32" r="1.2" fill="#a9ff7e"/></svg>`},
+  {id:'seaangel',name:'ハダカカメガイ',sci:'Clione limacina',zone:'midnight',rarity:'common',minD:200,maxD:2000,
+   desc:'透き通る翼を翻して舞う海の天使。極寒を愛す。',
+   svg:`<svg viewBox="0 0 80 80" width="70" height="70"><path d="M40 15 Q48 35 42 65 Q35 35 40 15 Z" fill="rgba(255,200,220,.7)" stroke="#a83a5a" stroke-width="1"/><ellipse cx="20" cy="30" rx="14" ry="10" fill="rgba(255,200,220,.55)" stroke="#a83a5a" stroke-width=".8" transform="rotate(-30 20 30)"/><ellipse cx="60" cy="30" rx="14" ry="10" fill="rgba(255,200,220,.55)" stroke="#a83a5a" stroke-width=".8" transform="rotate(30 60 30)"/><circle cx="40" cy="20" r="2" fill="#a83a5a"/><path d="M38 65 Q35 75 32 78 M42 65 Q45 75 48 78" stroke="#a83a5a" stroke-width=".8" fill="none"/></svg>`},
+  {id:'combjelly',name:'ウリクラゲ',sci:'Beroe cucumis',zone:'midnight',rarity:'common',minD:100,maxD:3000,
+   desc:'七色の繊毛が虹のごとく波打つ。透明な袋状の生物。',
+   svg:`<svg viewBox="0 0 80 100" width="68" height="86"><path d="M40 8 Q60 15 60 60 Q55 85 40 92 Q25 85 20 60 Q20 15 40 8 Z" fill="rgba(180,220,240,.4)" stroke="rgba(120,180,220,.7)" stroke-width="1"/><path d="M28 18 L28 85" stroke="#7ae3ff" stroke-width="1" opacity=".7"/><path d="M36 14 L36 88" stroke="#a9ff7e" stroke-width="1" opacity=".7"/><path d="M44 14 L44 88" stroke="#d286ff" stroke-width="1" opacity=".7"/><path d="M52 18 L52 85" stroke="#ff7ec0" stroke-width="1" opacity=".7"/></svg>`},
+  {id:'osedax',name:'ホネクイハナムシ',sci:'Osedax',zone:'midnight',rarity:'uncommon',minD:1500,maxD:4000,
+   desc:'鯨の骨を喰らう奇怪な虫。羽飾りで呼吸する。',
+   svg:`<svg viewBox="0 0 100 80" width="88" height="72"><rect x="40" y="40" width="20" height="38" fill="#a85040" stroke="#3a0a0a" stroke-width="1"/><path d="M50 40 Q35 20 25 8 M50 40 Q60 18 58 5 M50 40 Q70 20 80 8 M50 40 Q40 18 30 4 M50 40 Q55 18 50 4 M50 40 Q70 22 75 5" stroke="#d8606a" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M30 78 L70 78 L65 65 L35 65 Z" fill="#dadada" stroke="#3a2a1a" stroke-width=".8"/><path d="M40 70 L42 76 M48 68 L50 76 M56 70 L58 76 M64 70 L62 76" stroke="#7a7a7a" stroke-width=".5"/></svg>`},
+  {id:'sleepershark',name:'ニシオンデンザメ',sci:'Somniosus microcephalus',zone:'midnight',rarity:'rare',minD:500,maxD:2200,
+   desc:'四百年を生きる長寿の鮫。寒冷な深海をゆるやかに泳ぐ。',
+   svg:`<svg viewBox="0 0 200 60" width="170" height="52"><path d="M10 30 Q40 12 100 18 L170 28 L195 32 L170 36 Q100 48 40 50 L10 30 Z" fill="#3a3a4a" stroke="#0a0a1a" stroke-width="1.2"/><path d="M195 32 L210 22 L210 42 L195 36 Z" fill="#1a1a2a"/><path d="M120 18 Q125 4 135 12 Z M120 50 Q125 60 135 52 Z" fill="#2a2a3a" stroke="#0a0a1a"/><circle cx="38" cy="25" r="2" fill="#1a1a1a"/><circle cx="38" cy="25" r=".8" fill="#fff"/><path d="M22 32 L30 30 L26 38" stroke="#0a0a1a" stroke-width=".5" fill="none"/></svg>`},
+
+  {id:'spermwhale',name:'マッコウクジラ',sci:'Physeter macrocephalus',zone:'midnight',rarity:'legendary',minD:200,maxD:2200,
+   desc:'巨大な四角い頭と歯を持つ。深海まで潜りダイオウイカと戦う。',
+   svg:`<svg viewBox="0 0 240 70" width="200" height="58"><path d="M10 35 Q15 8 65 12 L200 28 L225 35 L200 42 Q90 60 30 58 L10 35 Z" fill="#3a3a3a" stroke="#0a0a0a" stroke-width="1.2"/><path d="M225 35 L240 28 L240 42 L225 38 Z" fill="#1a1a1a"/><path d="M150 14 Q170 4 180 14 L160 22" fill="#5a5a5a" stroke="#0a0a0a" stroke-width=".8"/><circle cx="50" cy="34" r="2" fill="#1a1a1a"/><path d="M30 42 Q60 50 90 46" stroke="#0a0a0a" stroke-width="1" fill="none"/><path d="M40 28 L42 22 L46 28 M50 26 L52 18 L56 26" stroke="#5a5a5a" stroke-width=".5"/></svg>`},
+  {id:'dragonfish',name:'ブラックドラゴンフィッシュ',sci:'Idiacanthus atlanticus',zone:'midnight',rarity:'rare',minD:1000,maxD:2000,
+   desc:'黒く長き蛇状の体に発光器。雌は雄の三十倍の大きさ。',
+   svg:`<svg viewBox="0 0 200 30" width="170" height="26"><path d="M10 15 Q20 6 38 12 L185 14 L195 15 L185 16 L38 18 Q20 24 10 15 Z" fill="#0a000a" stroke="#000" stroke-width="1"/><circle cx="22" cy="14" r="1.5" fill="#fff"/><circle cx="22" cy="14" r=".8" fill="#000"/><circle cx="38" cy="14" r="1.5" fill="#a9ff7e"/><circle cx="55" cy="16" r="1.2" fill="#7ae3ff"/><circle cx="80" cy="14" r="1.2" fill="#7ae3ff"/><circle cx="105" cy="16" r="1.2" fill="#7ae3ff"/><circle cx="130" cy="14" r="1.2" fill="#7ae3ff"/><circle cx="155" cy="16" r="1.2" fill="#7ae3ff"/><circle cx="180" cy="14" r="1.2" fill="#7ae3ff"/></svg>`},
+  {id:'bristle',name:'ヒゲエソ',sci:'Cyclothone',zone:'midnight',rarity:'common',minD:500,maxD:3000,
+   desc:'地球上で最も個体数の多い脊椎動物の一群。透き通る体。',
+   svg:`<svg viewBox="0 0 100 30" width="86" height="26"><path d="M10 15 Q20 6 35 10 L85 14 L90 15 L85 16 L35 20 Q20 24 10 15 Z" fill="rgba(60,80,100,.7)" stroke="#1a2a3a" stroke-width=".8"/><circle cx="20" cy="13" r="1.5" fill="#1a1a1a"/><path d="M22 18 L28 18 L34 16 L40 18 L46 16 L52 18 L58 16 L64 18 L70 16" stroke="#7ae3ff" stroke-width=".5"/></svg>`},
+  {id:'oniangler',name:'オニアンコウ',sci:'Linophryne arborifera',zone:'midnight',rarity:'rare',minD:1500,maxD:4000,
+   desc:'触毛の生えた誘餌と顎髭を持つ。雌は雄を体に取り込む。',
+   svg:`<svg viewBox="0 0 110 90" width="95" height="80"><path d="M15 50 Q25 18 55 18 Q90 22 100 50 Q90 70 60 70 Q25 70 15 50 Z" fill="#0a000a" stroke="#000" stroke-width="1.2"/><path d="M55 18 L58 4 L62 12 L66 0 L70 14 L74 4 L78 16 Z" fill="#3a0a3a" stroke="#000" stroke-width=".5"/><circle cx="78" cy="16" r="2.5" fill="#a9ff7e"/><circle cx="78" cy="16" r="4" fill="#a9ff7e" opacity=".4"/><path d="M50 70 Q48 80 44 88 M55 70 Q54 82 52 90 M62 70 Q64 82 66 90 M70 70 Q72 80 76 88" stroke="#3a0a3a" stroke-width="1.5" fill="none"/><circle cx="42" cy="42" r="2" fill="#fff"/><circle cx="42" cy="42" r=".8" fill="#000"/><path d="M28 50 L34 56 L38 50 L42 58 L46 50 L52 58" stroke="#fff" stroke-width=".5" fill="none"/></svg>`},
+  {id:'telescope',name:'リュウグウハダカ',sci:'Gigantura',zone:'midnight',rarity:'uncommon',minD:500,maxD:3000,
+   desc:'前を向く望遠鏡のような筒状の眼。獲物を上方より狙う。',
+   svg:`<svg viewBox="0 0 130 50" width="115" height="44"><path d="M10 25 Q20 10 40 14 L115 22 L115 28 L40 36 Q20 40 10 25 Z" fill="#3a4a5a" stroke="#0a1a2a" stroke-width="1"/><rect x="22" y="16" width="6" height="10" fill="#1a1a1a" stroke="#000" stroke-width=".5"/><rect x="22" y="14" width="6" height="3" fill="#7ae3ff"/><circle cx="22" cy="14" r="1.5" fill="#fff"/><path d="M115 22 L125 18 L125 32 L115 28 Z" fill="#1a2a3a"/></svg>`},
+  {id:'tubeeye',name:'ボウエンギョ',sci:'Stylephorus chordatus',zone:'midnight',rarity:'rare',minD:500,maxD:1000,
+   desc:'望遠鏡のような筒目を持つ細長き深海の珍魚。',
+   svg:`<svg viewBox="0 0 200 35" width="170" height="30"><path d="M10 18 Q20 10 35 14 L185 16 L185 20 L35 22 Q20 26 10 18 Z" fill="#a8c8d8" stroke="#3a5a6a" stroke-width=".8"/><circle cx="20" cy="16" r="2.5" fill="#fff"/><circle cx="20" cy="16" r="1.2" fill="#1a1a1a"/><path d="M185 16 L195 14 L195 22 L185 20 Z" fill="#7a9aaa"/></svg>`},
+  {id:'blackslime',name:'クロボウズギス',sci:'Pseudoscopelus',zone:'midnight',rarity:'uncommon',minD:1000,maxD:3000,
+   desc:'真っ黒な体に発光する点を散らす深海の刺客。',
+   svg:`<svg viewBox="0 0 130 50" width="115" height="44"><path d="M10 25 Q22 8 45 14 L110 22 L120 25 L110 28 L45 36 Q22 42 10 25 Z" fill="#0a000a" stroke="#000" stroke-width="1"/><circle cx="22" cy="22" r="1.5" fill="#fff"/><circle cx="22" cy="22" r=".8" fill="#000"/><circle cx="40" cy="22" r="1" fill="#a9ff7e"/><circle cx="55" cy="20" r="1" fill="#a9ff7e"/><circle cx="70" cy="22" r="1" fill="#a9ff7e"/><circle cx="85" cy="20" r="1" fill="#a9ff7e"/><circle cx="100" cy="22" r="1" fill="#a9ff7e"/><circle cx="48" cy="30" r="1" fill="#a9ff7e"/><circle cx="62" cy="32" r="1" fill="#a9ff7e"/><circle cx="78" cy="30" r="1" fill="#a9ff7e"/><circle cx="92" cy="32" r="1" fill="#a9ff7e"/></svg>`},
+
+  // ABYSS
+  {id:'dumbo',name:'メンダコ',sci:'Grimpoteuthis',zone:'abyss',rarity:'uncommon',minD:1000,maxD:5000,
+   desc:'耳のような鰭をはためかせ、優雅に舞う愛らしい蛸。',
+   svg:`<svg viewBox="0 0 120 90" width="105" height="80"><ellipse cx="60" cy="35" rx="28" ry="22" fill="#c85a3a" stroke="#5a1a08" stroke-width="1.2"/><ellipse cx="25" cy="32" rx="18" ry="10" fill="#c85a3a" opacity=".9" stroke="#5a1a08" stroke-width="1"/><ellipse cx="95" cy="32" rx="18" ry="10" fill="#c85a3a" opacity=".9" stroke="#5a1a08" stroke-width="1"/><circle cx="50" cy="32" r="3" fill="#1a0a0a"/><circle cx="70" cy="32" r="3" fill="#1a0a0a"/><circle cx="50" cy="31" r="1" fill="#fff"/><circle cx="70" cy="31" r="1" fill="#fff"/><path d="M45 56 Q42 75 40 85 M55 58 Q52 78 50 86 M65 58 Q68 78 70 86 M75 56 Q78 75 80 85 M50 57 Q45 72 45 85 M70 57 Q75 72 75 85" stroke="#8a3a20" stroke-width="1.5" fill="none"/></svg>`},
+  {id:'isopod',name:'オオグソクムシ',sci:'Bathynomus doederleinii',zone:'abyss',rarity:'common',minD:500,maxD:2500,
+   desc:'深海に潜む巨大な等脚類。硬き甲冑をまとう。',
+   svg:`<svg viewBox="0 0 120 70" width="100" height="60"><path d="M10 35 Q18 18 35 18 L85 18 Q102 18 110 35 Q102 52 85 52 L35 52 Q18 52 10 35 Z" fill="#6a5a4a" stroke="#2a1a0a" stroke-width="1.2"/><path d="M25 20 L25 50 M38 20 L38 50 M51 20 L51 50 M64 20 L64 50 M77 20 L77 50 M90 20 L90 50" stroke="#2a1a0a" stroke-width=".8"/><path d="M8 30 L0 22 L4 35 L0 48 L8 40 M110 30 L118 22 L115 35 L118 48 L110 40" stroke="#2a1a0a" stroke-width="1" fill="#4a3a2a"/><circle cx="22" cy="28" r="1.2" fill="#1a0a0a"/><circle cx="22" cy="42" r="1.2" fill="#1a0a0a"/></svg>`},
+  {id:'snailfish',name:'シンカイクサウオ',sci:'Notoliparis',zone:'abyss',rarity:'common',minD:3000,maxD:6000,
+   desc:'ぷよぷよと柔らかな体で深海の圧力に耐える。',
+   svg:`<svg viewBox="0 0 110 50" width="95" height="42"><path d="M10 25 Q25 10 55 16 L95 22 L95 28 L55 34 Q25 40 10 25 Z" fill="#d8a8b8" opacity=".85" stroke="#5a2a3a" stroke-width="1"/><circle cx="25" cy="22" r="2" fill="#1a0a0a"/><path d="M20 28 Q28 32 36 28" stroke="#5a2a3a" stroke-width=".8" fill="none"/><path d="M95 22 L108 18 L108 32 L95 28 Z" fill="#b88898" stroke="#5a2a3a"/></svg>`},
+  {id:'seapig',name:'ユメナマコ',sci:'Enypniastes eximia',zone:'abyss',rarity:'uncommon',minD:2000,maxD:6000,
+   desc:'ゼリーのような透明な体を震わせ海底を漂う夢見る生物。',
+   svg:`<svg viewBox="0 0 130 80" width="115" height="70"><path d="M15 45 Q25 18 65 20 Q110 22 118 45 Q110 65 65 65 Q25 65 15 45 Z" fill="rgba(240,140,180,.7)" stroke="#8a3a5a" stroke-width="1.2"/><path d="M50 22 Q52 8 60 8 Q68 8 66 22 M75 22 Q78 10 85 12 Q90 14 86 24" stroke="#8a3a5a" stroke-width="1.5" fill="rgba(240,140,180,.5)"/><circle cx="45" cy="40" r="2" fill="#4a0a2a"/><circle cx="65" cy="42" r="2" fill="#4a0a2a"/><circle cx="85" cy="40" r="2" fill="#4a0a2a"/><path d="M25 50 Q20 62 18 70 M40 60 Q38 72 36 75" stroke="#8a3a5a" stroke-width="1" fill="none"/></svg>`},
+  {id:'giantisopod',name:'ダイオウグソクムシ',sci:'Bathynomus giganteus',zone:'abyss',rarity:'rare',minD:500,maxD:2300,
+   desc:'絶食に耐えること五年。深淵の守護神のごとき巨大等脚。',
+   svg:`<svg viewBox="0 0 150 80" width="130" height="70"><path d="M12 40 Q22 15 45 15 L105 15 Q128 15 138 40 Q128 65 105 65 L45 65 Q22 65 12 40 Z" fill="#3a4a3a" stroke="#0a1a0a" stroke-width="1.5"/><path d="M28 18 L28 62 M44 18 L44 62 M60 18 L60 62 M76 18 L76 62 M92 18 L92 62 M108 18 L108 62 M124 18 L124 62" stroke="#0a1a0a" stroke-width="1"/><path d="M10 35 L-2 22 L4 42 L-2 58 L10 45 M138 35 L150 22 L144 42 L150 58 L138 45" stroke="#0a1a0a" stroke-width="1.2" fill="#2a3a2a"/><circle cx="25" cy="30" r="2" fill="#c8ff7e"/><circle cx="25" cy="50" r="2" fill="#c8ff7e"/><path d="M3 25 L-6 18 M3 55 L-6 62" stroke="#0a1a0a" stroke-width="1.5"/></svg>`},
+  {id:'tripodfish',name:'サンアシウオ',sci:'Bathypterois grallator',zone:'abyss',rarity:'uncommon',minD:3500,maxD:5500,
+   desc:'三本の脚のような長い鰭で海底に立ち続ける。',
+   svg:`<svg viewBox="0 0 130 90" width="115" height="80"><path d="M15 35 Q35 20 70 23 L110 28 L110 34 L70 37 Q35 42 15 35 Z" fill="#8a7a6a" stroke="#2a1a0a" stroke-width="1"/><circle cx="100" cy="29" r="1.5" fill="#1a1a1a"/><path d="M30 40 L18 85 M55 40 L50 85 M90 38 L100 85" stroke="#6a5a4a" stroke-width="1.5" fill="none"/><path d="M110 28 L120 20 L118 32 L120 42 L110 34 Z" fill="#6a5a4a" stroke="#2a1a0a"/></svg>`},
+  {id:'blobfish',name:'ニュウドウカジカ',sci:'Psychrolutes microporos',zone:'abyss',rarity:'rare',minD:600,maxD:2800,
+   desc:'低圧では崩れた塊となるが、深海では立派な姿を持つ。',
+   svg:`<svg viewBox="0 0 110 80" width="95" height="70"><path d="M15 50 Q25 15 60 18 Q90 22 100 50 Q90 65 70 65 Q60 75 50 65 Q25 65 15 50 Z" fill="#d8b8b0" stroke="#5a3a30" stroke-width="1.2"/><path d="M40 30 Q50 18 55 32 Z" fill="#a88a80" stroke="#5a3a30" stroke-width=".8"/><circle cx="40" cy="40" r="3" fill="#1a1a1a"/><circle cx="40" cy="40" r="1.2" fill="#fff"/><circle cx="60" cy="40" r="3" fill="#1a1a1a"/><circle cx="60" cy="40" r="1.2" fill="#fff"/><path d="M35 55 Q50 62 65 55" stroke="#5a3a30" stroke-width="1.5" fill="none"/></svg>`},
+  {id:'cutthroateel',name:'イラコアナゴ',sci:'Synaphobranchus kaupii',zone:'abyss',rarity:'common',minD:500,maxD:4500,
+   desc:'のどに切れ目があるように見える深海の鰻。',
+   svg:`<svg viewBox="0 0 170 30" width="145" height="26"><path d="M10 15 Q22 6 45 12 L160 14 L160 16 L45 18 Q22 24 10 15 Z" fill="#5a4838" stroke="#1a0a0a" stroke-width="1"/><path d="M22 20 Q30 24 36 22" stroke="#1a0a0a" stroke-width=".8" fill="none"/><circle cx="22" cy="13" r="1.5" fill="#1a1a1a"/><path d="M30 16 L40 16 L40 18 L30 18 Z" fill="#1a0a0a"/></svg>`},
+  {id:'tubeworm',name:'ハオリムシ',sci:'Riftia pachyptila',zone:'abyss',rarity:'uncommon',minD:1500,maxD:4000,
+   desc:'熱水噴出孔に群れる赤き羽根を持つ管棲虫。光なき場所で生きる。',
+   svg:`<svg viewBox="0 0 80 110" width="68" height="92"><path d="M30 100 L30 50 Q30 35 35 25 L40 18 L45 25 Q50 35 50 50 L50 100 Z" fill="#dadada" stroke="#3a2a1a" stroke-width="1"/><path d="M35 18 Q35 5 40 0 Q45 5 45 18 L40 22 Z" fill="#d83040" stroke="#5a0a0a" stroke-width="1"/><path d="M32 8 Q30 0 28 5 M48 8 Q50 0 52 5 M40 0 L40 -5" stroke="#a82030" stroke-width="1.5" fill="none"/><path d="M30 55 L50 55 M30 65 L50 65 M30 75 L50 75 M30 85 L50 85" stroke="#7a6a58" stroke-width=".5"/></svg>`},
+  {id:'deepstar',name:'シンカイヒトデ',sci:'Freyella elegans',zone:'abyss',rarity:'common',minD:2000,maxD:6000,
+   desc:'長き腕を放射状に伸ばす深海の星。底に張り付く。',
+   svg:`<svg viewBox="0 0 100 100" width="88" height="88"><path d="M50 50 L48 8 L52 8 Z M50 50 L88 38 L86 42 Z M50 50 L84 80 L80 84 Z M50 50 L20 88 L16 84 Z M50 50 L12 38 L14 42 Z" fill="#a85a4a" stroke="#3a0a08" stroke-width="1.2"/><circle cx="50" cy="50" r="6" fill="#5a1a1a" stroke="#3a0a08" stroke-width="1"/><circle cx="50" cy="20" r="1" fill="#3a0a08"/><circle cx="78" cy="42" r="1" fill="#3a0a08"/><circle cx="74" cy="78" r="1" fill="#3a0a08"/><circle cx="26" cy="78" r="1" fill="#3a0a08"/><circle cx="22" cy="42" r="1" fill="#3a0a08"/></svg>`},
+  {id:'glowcucumber',name:'ホタルナマコ',sci:'Enypniastes',zone:'abyss',rarity:'uncommon',minD:2000,maxD:5000,
+   desc:'危機に際し青い光を発しつつ皮膚を脱ぎ捨て逃げる。',
+   svg:`<svg viewBox="0 0 130 70" width="115" height="62"><defs><radialGradient id="glowC"><stop offset="0" stop-color="#7ae3ff" stop-opacity=".5"/><stop offset="1" stop-color="#7ae3ff" stop-opacity="0"/></radialGradient></defs><ellipse cx="65" cy="40" rx="60" ry="28" fill="url(#glowC)"/><path d="M15 40 Q22 18 60 18 Q105 20 115 40 Q105 60 60 60 Q22 60 15 40 Z" fill="rgba(150,180,210,.6)" stroke="#3a5a7a" stroke-width="1.2"/><circle cx="35" cy="38" r="1.5" fill="#7ae3ff"/><circle cx="55" cy="36" r="1.5" fill="#7ae3ff"/><circle cx="75" cy="38" r="1.5" fill="#7ae3ff"/><circle cx="95" cy="40" r="1.5" fill="#7ae3ff"/><circle cx="45" cy="48" r="1.5" fill="#7ae3ff"/><circle cx="65" cy="50" r="1.5" fill="#7ae3ff"/><circle cx="85" cy="48" r="1.5" fill="#7ae3ff"/></svg>`},
+  {id:'ribbonworm',name:'シンカイヒモムシ',sci:'Pelagonemertes',zone:'abyss',rarity:'common',minD:1000,maxD:5000,
+   desc:'幾重にも体を絡ませる長きリボンの如き蠕虫。',
+   svg:`<svg viewBox="0 0 130 60" width="115" height="52"><path d="M10 30 Q25 10 45 30 Q65 50 85 30 Q105 10 120 30" stroke="#c84a8a" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M10 30 Q25 10 45 30 Q65 50 85 30 Q105 10 120 30" stroke="#a83a7a" stroke-width="2" fill="none"/><circle cx="120" cy="30" r="3" fill="#a83a7a"/><circle cx="120" cy="30" r="1" fill="#fff"/></svg>`},
+
+  {id:'glasssponge',name:'カイロウドウケツ',sci:'Euplectella aspergillum',zone:'abyss',rarity:'uncommon',minD:500,maxD:5000,
+   desc:'ガラス繊維の格子模様の籠。中に共生エビが住まう。',
+   svg:`<svg viewBox="0 0 80 110" width="68" height="92"><path d="M30 100 Q25 50 40 8 Q55 50 50 100 Z" fill="rgba(220,230,240,.5)" stroke="#7aa8c8" stroke-width="1"/><path d="M30 30 L50 30 M28 50 L52 50 M28 70 L52 70 M28 90 L52 90 M30 30 L50 50 M30 50 L50 30 M30 50 L50 70 M30 70 L50 50 M30 70 L50 90 M30 90 L50 70" stroke="#a8c8d8" stroke-width=".5"/></svg>`},
+  {id:'longfin',name:'ヒレナガアンコウ',sci:'Caulophryne polynema',zone:'abyss',rarity:'rare',minD:1500,maxD:4000,
+   desc:'放射状の長き鰭で水流を感知する黒き深海のアンコウ。',
+   svg:`<svg viewBox="0 0 130 100" width="115" height="88"><circle cx="60" cy="50" r="32" fill="#0a000a" stroke="#000" stroke-width="1.2"/><path d="M60 18 L62 4 L66 14" fill="#000" stroke="#000"/><circle cx="68" cy="14" r="2" fill="#a9ff7e"/><path d="M30 30 Q15 18 5 8 M28 40 Q12 32 2 30 M30 60 Q15 65 4 75 M30 70 Q18 80 8 95 M88 30 Q105 18 115 8 M90 40 Q108 32 118 30 M88 60 Q105 65 116 75 M85 70 Q102 80 112 95" stroke="#3a3a4a" stroke-width="1.2" fill="none" stroke-linecap="round"/><path d="M50 45 L52 55 L56 45 M58 45 L60 55 L64 45" stroke="#fff" stroke-width=".5" fill="none"/><circle cx="48" cy="42" r="1.5" fill="#fff"/></svg>`},
+  {id:'deepsponge',name:'シンカイカイメン',sci:'Cladorhiza',zone:'abyss',rarity:'common',minD:2000,maxD:6000,
+   desc:'枝分かれする樹のような海綿。微生物を捕食する珍しき肉食種。',
+   svg:`<svg viewBox="0 0 100 110" width="86" height="92"><path d="M50 100 L50 50 Q50 35 45 28 L40 18 M50 50 Q50 35 55 28 L60 18 M50 65 L35 55 L25 50 M50 65 L65 55 L75 50 M50 80 L30 70 L20 65 M50 80 L70 70 L80 65" stroke="#a89898" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="40" cy="18" r="3" fill="#a89898"/><circle cx="60" cy="18" r="3" fill="#a89898"/><circle cx="25" cy="50" r="2.5" fill="#a89898"/><circle cx="75" cy="50" r="2.5" fill="#a89898"/><circle cx="20" cy="65" r="2" fill="#a89898"/><circle cx="80" cy="65" r="2" fill="#a89898"/></svg>`},
+  {id:'deepshrimp',name:'シンカイエビ',sci:'Acanthephyra',zone:'abyss',rarity:'common',minD:1000,maxD:5000,
+   desc:'危機に発光する液体を吐き出して敵を眩ませる赤き蝦。',
+   svg:`<svg viewBox="0 0 130 50" width="115" height="44"><path d="M15 25 Q20 12 38 12 L100 18 L120 25 L100 32 L38 38 Q20 38 15 25 Z" fill="#a82030" stroke="#3a0008" stroke-width=".8"/><path d="M30 14 L30 36 M42 13 L42 37 M55 14 L55 36 M68 14 L68 36 M80 16 L80 34 M92 18 L92 32" stroke="#3a0008" stroke-width=".4"/><circle cx="25" cy="20" r="1.2" fill="#1a0008"/><circle cx="25" cy="30" r="1.2" fill="#1a0008"/><path d="M15 22 L4 14 M15 28 L4 38" stroke="#3a0008" stroke-width=".8"/><path d="M120 25 L130 18 L130 32 Z" fill="#7a1020" stroke="#3a0008"/></svg>`},
+  {id:'deepcoral',name:'シンカイサンゴ',sci:'Lophelia pertusa',zone:'abyss',rarity:'common',minD:200,maxD:3000,
+   desc:'光なき深海でも育つ冷水珊瑚。生命の砂漠の小さな森。',
+   svg:`<svg viewBox="0 0 100 110" width="86" height="92"><path d="M50 105 L50 60 M50 80 Q35 70 25 55 M50 80 Q65 70 75 55 M50 70 Q40 60 30 45 M50 70 Q60 60 70 45 M50 55 Q42 45 35 30 M50 55 Q58 45 65 30 M50 40 Q44 30 38 18 M50 40 Q56 30 62 18 M50 25 L50 8" stroke="#e8c8a8" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="25" cy="55" r="3" fill="#e8c8a8"/><circle cx="75" cy="55" r="3" fill="#e8c8a8"/><circle cx="30" cy="45" r="2.5" fill="#e8c8a8"/><circle cx="70" cy="45" r="2.5" fill="#e8c8a8"/><circle cx="35" cy="30" r="2.5" fill="#e8c8a8"/><circle cx="65" cy="30" r="2.5" fill="#e8c8a8"/><circle cx="38" cy="18" r="2" fill="#e8c8a8"/><circle cx="62" cy="18" r="2" fill="#e8c8a8"/><circle cx="50" cy="8" r="2.5" fill="#e8c8a8"/></svg>`},
+  {id:'brittlestar',name:'ケブカクモヒトデ',sci:'Ophiuroidea',zone:'abyss',rarity:'common',minD:1500,maxD:6000,
+   desc:'長く伸びる毛深い腕を絡めて獲物を捉える深海の蜘蛛。',
+   svg:`<svg viewBox="0 0 110 110" width="95" height="95"><circle cx="55" cy="55" r="6" fill="#5a4a3a" stroke="#1a0a0a" stroke-width="1"/><path d="M55 50 Q40 30 20 8 M55 50 Q45 25 35 4 M55 60 Q40 75 20 100 M55 60 Q45 80 35 105 M50 55 Q25 50 4 40 M50 55 Q30 60 4 60 M65 55 Q90 50 105 40 M65 55 Q90 60 105 60 M55 50 Q70 30 90 8 M55 50 Q65 25 75 4 M55 60 Q70 75 90 100 M55 60 Q65 80 75 105" stroke="#1a0a0a" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg>`},
+
+  // HADAL
+  {id:'marianasnail',name:'マリアナスネイルフィッシュ',sci:'Pseudoliparis swirei',zone:'hadal',rarity:'uncommon',minD:6000,maxD:8200,
+   desc:'八千メートルの深淵に棲む脊椎動物の最深の住人。',
+   svg:`<svg viewBox="0 0 120 55" width="105" height="48"><path d="M10 28 Q22 12 55 16 L100 24 L100 32 L55 40 Q22 44 10 28 Z" fill="rgba(240,220,200,.7)" stroke="#5a3a2a" stroke-width="1"/><path d="M100 24 L112 18 L112 38 L100 32 Z" fill="rgba(200,180,160,.7)" stroke="#5a3a2a" stroke-width="1"/><circle cx="25" cy="25" r="1.8" fill="#1a1a1a"/><path d="M18 32 Q26 36 34 32" stroke="#5a3a2a" stroke-width=".8" fill="none"/><path d="M10 28 L0 18 L0 38 Z" fill="rgba(200,180,160,.6)"/></svg>`},
+  {id:'amphipod',name:'カイコウオオソコエビ',sci:'Hirondellea gigas',zone:'hadal',rarity:'common',minD:6500,maxD:11000,
+   desc:'海溝最深部に棲む小さな甲殻類。金属の殻で超高圧を凌ぐ。',
+   svg:`<svg viewBox="0 0 110 70" width="90" height="60"><path d="M20 35 Q25 18 45 18 L80 20 Q95 22 98 35 Q95 50 80 52 L45 54 Q25 54 20 35 Z" fill="#d8c8b8" stroke="#5a3a1a" stroke-width="1"/><path d="M32 20 L32 52 M42 20 L42 54 M55 19 L55 54 M68 19 L68 53 M81 20 L81 52" stroke="#5a3a1a" stroke-width=".8"/><path d="M18 32 L8 28 M18 40 L8 44 M98 32 L108 28 M98 40 L108 44" stroke="#5a3a1a" stroke-width="1.2"/><circle cx="28" cy="30" r="1.2" fill="#1a0a0a"/><circle cx="28" cy="42" r="1.2" fill="#1a0a0a"/><path d="M82 22 L92 10 M85 52 L95 62" stroke="#5a3a1a" stroke-width="1.5" fill="none"/></svg>`},
+  {id:'xenophyo',name:'ゼノフィオフォラ',sci:'Xenophyophorea',zone:'hadal',rarity:'uncommon',minD:5000,maxD:11000,
+   desc:'最深部に棲む単細胞の巨大生物。科学の謎に満ちた存在。',
+   svg:`<svg viewBox="0 0 120 120" width="100" height="100"><path d="M60 10 Q90 20 95 50 Q110 70 95 90 Q80 110 60 105 Q40 115 25 90 Q10 70 25 50 Q30 20 60 10 Z" fill="#2a4a3a" stroke="#0a1a0a" stroke-width="1.2" opacity=".85"/><path d="M35 40 Q55 45 75 40 M30 55 Q60 60 85 55 M35 70 Q60 75 80 70 M40 85 Q60 90 75 85" stroke="#4a6a5a" stroke-width=".8" fill="none"/><circle cx="50" cy="50" r="2" fill="#7ae3ff" opacity=".6"/><circle cx="70" cy="60" r="2" fill="#7ae3ff" opacity=".6"/><circle cx="55" cy="75" r="2" fill="#7ae3ff" opacity=".6"/></svg>`},
+  {id:'unknownfish',name:'未知の発光生物',sci:'Species incognita',zone:'hadal',rarity:'rare',minD:7000,maxD:11000,
+   desc:'名もなき闇の住人。全身から青白い光を放つ。',
+   svg:`<svg viewBox="0 0 130 70" width="115" height="62"><defs><radialGradient id="glowA"><stop offset="0" stop-color="#7ae3ff" stop-opacity=".8"/><stop offset="1" stop-color="#7ae3ff" stop-opacity="0"/></radialGradient></defs><ellipse cx="65" cy="35" rx="55" ry="26" fill="url(#glowA)"/><path d="M15 35 Q30 15 70 18 L110 30 L110 40 L70 52 Q30 55 15 35 Z" fill="#0a1a3a" stroke="#7ae3ff" stroke-width="1.2"/><circle cx="28" cy="30" r="1.5" fill="#7ae3ff"/><circle cx="40" cy="35" r="1.5" fill="#7ae3ff"/><circle cx="52" cy="30" r="1.5" fill="#7ae3ff"/><circle cx="64" cy="36" r="1.5" fill="#7ae3ff"/><circle cx="76" cy="32" r="1.5" fill="#7ae3ff"/><circle cx="88" cy="38" r="1.5" fill="#7ae3ff"/><circle cx="96" cy="32" r="2.5" fill="#fff"/><circle cx="96" cy="32" r="1" fill="#000"/><path d="M15 35 L2 22 L5 35 L2 48 Z" fill="#0a1a3a" stroke="#7ae3ff" stroke-width="1"/></svg>`},
+  {id:'ancient',name:'古代魚の末裔',sci:'Reliquus abyssi',zone:'hadal',rarity:'legendary',minD:8000,maxD:11000,
+   desc:'数億年を生き延びた原初の魚類。化石の中からのみ知られていた種。',
+   svg:`<svg viewBox="0 0 170 80" width="150" height="72"><path d="M15 40 Q35 15 85 20 L135 30 L160 40 L135 50 L85 60 Q35 65 15 40 Z" fill="#2a3a4a" stroke="#7ae3ff" stroke-width="1"/><path d="M40 22 L45 8 L55 22 Z M65 20 L72 5 L80 20 Z M90 22 L98 6 L106 22 Z" fill="#3a4a5a" stroke="#7ae3ff" stroke-width=".8"/><path d="M40 58 L48 72 L55 58 Z M70 60 L78 74 L85 60 Z" fill="#3a4a5a" stroke="#7ae3ff" stroke-width=".8"/><circle cx="115" cy="35" r="3" fill="#a9ff7e"/><circle cx="115" cy="35" r="1" fill="#000"/><path d="M135 30 L158 22 L160 40 L158 58 L135 50 Z" fill="#1a2a3a" stroke="#7ae3ff" stroke-width=".8"/><path d="M30 32 L50 30 M30 42 L55 43 M60 30 L90 32 M60 42 L90 44" stroke="#7ae3ff" stroke-width=".4" opacity=".6"/></svg>`},
+  {id:'lord',name:'深海の主',sci:'Dominus profundi',zone:'hadal',rarity:'mythical',minD:10000,maxD:11000,
+   desc:'チャレンジャー海淵に住まう巨影。その姿を見たものは一人もいないと伝えられる。',
+   svg:`<svg viewBox="0 0 220 140" width="190" height="120"><defs><radialGradient id="glowB"><stop offset="0" stop-color="#d286ff" stop-opacity=".6"/><stop offset="1" stop-color="#d286ff" stop-opacity="0"/></radialGradient></defs><ellipse cx="110" cy="70" rx="100" ry="55" fill="url(#glowB)"/><path d="M20 70 Q40 20 100 30 L180 50 L210 70 L180 90 L100 110 Q40 120 20 70 Z" fill="#1a0a2a" stroke="#d286ff" stroke-width="1.5"/><path d="M50 40 L58 10 L70 42 Z M80 35 L90 8 L100 38 Z M115 38 L128 6 L138 42 Z M50 100 L58 130 L70 98 Z M85 105 L95 135 L105 102 Z" fill="#2a0a3a" stroke="#d286ff" stroke-width=".8"/><circle cx="150" cy="55" r="8" fill="#ff6a9a"/><circle cx="150" cy="55" r="14" fill="#ff6a9a" opacity=".3"/><circle cx="150" cy="55" r="3" fill="#000"/><circle cx="150" cy="85" r="8" fill="#ff6a9a"/><circle cx="150" cy="85" r="14" fill="#ff6a9a" opacity=".3"/><circle cx="150" cy="85" r="3" fill="#000"/><path d="M180 50 L212 35 L210 70 L212 105 L180 90 Z" fill="#0a0518" stroke="#d286ff" stroke-width="1"/><path d="M40 65 L80 63 L70 70 L90 68 M45 78 L75 80 L65 72 L85 76" stroke="#d286ff" stroke-width=".6" opacity=".7"/></svg>`},
+  {id:'hadalcucumber',name:'ハダルナマコ',sci:'Peniagone',zone:'hadal',rarity:'common',minD:6000,maxD:11000,
+   desc:'真の闇の底を這う紫色のナマコ。海溝の清掃者。',
+   svg:`<svg viewBox="0 0 120 50" width="105" height="44"><path d="M10 25 Q20 12 45 12 L80 14 Q105 16 110 25 Q105 34 80 36 L45 38 Q20 38 10 25 Z" fill="#6a3a8a" stroke="#1a0a2a" stroke-width="1"/><path d="M28 12 Q30 4 35 4 L40 12 M50 12 Q52 2 60 4 L62 12 M75 12 Q78 4 85 4 L88 14" stroke="#3a0a4a" stroke-width=".8" fill="#5a2a6a"/><circle cx="35" cy="24" r="1.5" fill="#0a000a"/><circle cx="55" cy="24" r="1.5" fill="#0a000a"/><circle cx="75" cy="24" r="1.5" fill="#0a000a"/></svg>`},
+  {id:'seaspider',name:'シンカイウミグモ',sci:'Colossendeis',zone:'hadal',rarity:'uncommon',minD:5000,maxD:11000,
+   desc:'体に対して巨大な脚を持つ。本物の蜘蛛とは別物の海の住人。',
+   svg:`<svg viewBox="0 0 130 110" width="115" height="95"><circle cx="65" cy="55" r="8" fill="#3a3a5a" stroke="#0a0a1a" stroke-width="1"/><path d="M58 50 Q35 25 8 8 M58 55 Q30 50 4 50 M58 60 Q35 85 8 102 M72 50 Q95 25 122 8 M72 55 Q100 50 126 50 M72 60 Q95 85 122 102 M64 47 Q60 22 60 4 M66 47 Q70 22 70 4" stroke="#0a0a1a" stroke-width="1.2" fill="none" stroke-linecap="round"/><circle cx="62" cy="53" r="1" fill="#7ae3ff"/><circle cx="68" cy="53" r="1" fill="#7ae3ff"/></svg>`},
+  {id:'crystalshell',name:'クリスタル巻貝',sci:'Crystallum profundum',zone:'hadal',rarity:'rare',minD:7000,maxD:11000,
+   desc:'氷晶のごとき透明な殻を持つ。極限の圧力が作り出した宝石。',
+   svg:`<svg viewBox="0 0 100 100" width="88" height="88"><defs><linearGradient id="crysG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d8e8ff" stop-opacity=".8"/><stop offset="1" stop-color="#7ae3ff" stop-opacity=".5"/></linearGradient></defs><path d="M50 8 Q80 18 88 50 Q80 82 50 92 Q20 82 12 50 Q20 18 50 8 Z" fill="url(#crysG)" stroke="#a8d8ff" stroke-width="1.2"/><path d="M50 18 L70 35 L75 60 L60 80 L40 80 L25 60 L30 35 Z" fill="none" stroke="#fff" stroke-width="1" opacity=".6"/><path d="M50 18 L50 80 M30 35 L70 60 M70 35 L30 60" stroke="#fff" stroke-width=".6" opacity=".5"/><circle cx="50" cy="50" r="3" fill="#fff" opacity=".8"/></svg>`},
+  {id:'hadalworm',name:'ハダルゴカイ',sci:'Hadarchaea',zone:'hadal',rarity:'common',minD:7000,maxD:11000,
+   desc:'真の闇の堆積物に潜む小さな環形動物。光なき場所の住人。',
+   svg:`<svg viewBox="0 0 130 25" width="115" height="22"><path d="M5 12 Q15 4 30 8 L120 12 L125 12 L120 13 L30 17 Q15 21 5 12 Z" fill="#7a3a4a" stroke="#1a000a" stroke-width=".8"/><path d="M22 6 L22 18 M32 5 L32 19 M42 6 L42 18 M52 6 L52 18 M62 7 L62 17 M72 7 L72 17 M82 7 L82 17 M92 8 L92 16 M102 8 L102 16 M112 9 L112 15" stroke="#1a000a" stroke-width=".4"/><circle cx="14" cy="11" r="1" fill="#1a000a"/></svg>`},
+  {id:'blindsnail',name:'スケーリーフット',sci:'Chrysomallon squamiferum',zone:'hadal',rarity:'rare',minD:2000,maxD:11000,
+   desc:'熱水噴出孔に住む鉄の鱗を纏う巻貝。生体金属の唯一の例。',
+   svg:`<svg viewBox="0 0 110 80" width="95" height="70"><circle cx="55" cy="40" r="32" fill="#3a3a4a" stroke="#000" stroke-width="1.2"/><path d="M55 8 Q75 20 80 40 Q75 60 55 72 Q35 60 30 40 Q35 20 55 8" fill="none" stroke="#7a8a9a" stroke-width="1"/><path d="M55 20 Q70 30 70 40 Q70 50 55 60 Q40 50 40 40 Q40 30 55 20" fill="none" stroke="#7a8a9a" stroke-width=".8"/><path d="M55 30 Q62 35 62 40 Q62 45 55 50" fill="none" stroke="#7a8a9a" stroke-width=".5"/><circle cx="55" cy="40" r="2" fill="#000"/><path d="M88 40 Q98 30 100 38 M88 40 Q98 50 100 42" stroke="#000" stroke-width="1" fill="none"/></svg>`},
+  {id:'hadalsponge',name:'マリアナカイメン',sci:'Demospongiae',zone:'hadal',rarity:'uncommon',minD:6000,maxD:11000,
+   desc:'最深部にも生命を残す原始の海綿。海溝の沈黙の住人。',
+   svg:`<svg viewBox="0 0 90 100" width="78" height="86"><path d="M20 95 Q15 50 30 15 Q45 5 60 15 Q75 50 70 95 Z" fill="#5a5a7a" stroke="#1a1a3a" stroke-width="1"/><circle cx="35" cy="35" r="3" fill="#0a0a1a"/><circle cx="55" cy="40" r="3" fill="#0a0a1a"/><circle cx="40" cy="55" r="3" fill="#0a0a1a"/><circle cx="60" cy="60" r="2.5" fill="#0a0a1a"/><circle cx="35" cy="75" r="2.5" fill="#0a0a1a"/><circle cx="55" cy="80" r="2.5" fill="#0a0a1a"/><circle cx="45" cy="20" r="2" fill="#0a0a1a"/></svg>`}
+];
+
+const RARITY_WEIGHT = {common:10,uncommon:4,rare:1.5,legendary:.5,mythical:.15};
+const RARITY_LABEL = {
+  common:'★☆☆☆☆',
+  uncommon:'★★☆☆☆',
+  rare:'★★★☆☆',
+  legendary:'★★★★☆',
+  mythical:'★★★★★'
+};
+const RARITY_RANK = {common:0,uncommon:1,rare:2,legendary:3,mythical:4};
+
+// =================== STATE ===================
+const STORAGE_KEY = 'deepSeaFishing_v1';
+
+const state = {
+  phase:'idle',   // idle | casting | waiting | biting | reeling | caught | escaped
+  depth:0,
+  targetDepth:0,
+  descent:0,
+  casts:0,
+  maxDepth:0,
+  collection:{},  // id -> count
+  biteTimer:null,
+  reelProgress:0,
+  reelTimer:null,
+  biteStart:0,
+  currentBite:null,
+  reelDecayTimer:null,
+  reelTimeLimit:0,
+  reelTimerCountdown:null
+};
+
+function saveState(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      casts: state.casts,
+      maxDepth: state.maxDepth,
+      collection: state.collection
+    }));
+  }catch(e){/* storage unavailable */}
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return;
+    const data = JSON.parse(raw);
+    state.casts = data.casts || 0;
+    state.maxDepth = data.maxDepth || 0;
+    state.collection = data.collection || {};
+  }catch(e){/* storage unavailable or corrupted */}
+}
+
+function clearSavedState(){
+  try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+}
+
+// =================== DOM ===================
+const $ = id => document.getElementById(id);
+const $ocean = $('ocean');
+const $scene = $('scene');
+const $line = $('line');
+const $hook = $('hook');
+const $depthVal = $('depth-val');
+const $zoneNow = $('zone-now');
+const $statusText = $('status-text');
+const $statusHint = $('status-hint');
+const $statusSide = $('status-side');
+const $actionBtn = $('action-btn');
+const $biteRing = $('bite-ring');
+const $reelBarWrap = $('reel-bar-wrap');
+const $reelBarFill = $('reel-bar-fill');
+const $reelBarLabel = $('reel-bar-label');
+const $timeBarWrap = $('time-bar-wrap');
+const $timeBarFill = $('time-bar-fill');
+const $biteBanner = $('bite-banner');
+const $statTotal = $('stat-total');
+const $statMax = $('stat-max');
+const $statCasts = $('stat-casts');
+
+// =================== SCENE CONSTRUCTION ===================
+function buildScene(){
+  $scene.innerHTML = '';
+  $scene.style.height = WORLD_PX + 'px';
+
+  // each zone is a div stacked vertically with gradient
+  ZONES.forEach(z => {
+    const el = document.createElement('div');
+    el.className = 'zone';
+    el.style.top = (z.min * 0.8) + 'px';
+    el.style.height = ((z.max - z.min) * 0.8) + 'px';
+    el.style.background = `linear-gradient(to bottom, ${z.color1}, ${z.color2})`;
+
+    const label = document.createElement('div');
+    label.className = 'zone-label';
+    label.innerHTML = `<b>${z.name}</b>${z.en} · ${z.min}–${z.max}m`;
+    el.appendChild(label);
+
+    $scene.appendChild(el);
+  });
+
+  // sun rays in surface zone
+  for(let i=0;i<5;i++){
+    const ray = document.createElement('div');
+    ray.className='ray';
+    ray.style.left = (10 + i*22) + '%';
+    ray.style.top = '10px';
+    ray.style.transform = `rotate(${(i%2?-1:1)*(3+i*2)}deg)`;
+    $scene.appendChild(ray);
+  }
+
+  // bioluminescent particles from 400m down — sparser & dimmer in deepest zones
+  for(let i=0;i<70;i++){
+    const s = document.createElement('div');
+    s.className='spark';
+    // bias toward shallower depths (fewer sparks below 7000m)
+    let d = 400 + Math.random()*Math.random()*10500;
+    s.style.top = (d*0.8) + 'px';
+    s.style.left = (5 + Math.random()*90) + '%';
+    const size = 1 + Math.random()*1.5;
+    s.style.width = size+'px';
+    s.style.height = size+'px';
+    // dim deep particles
+    let opacity = 1;
+    if(d > 8000) opacity = .35;
+    else if(d > 6500) opacity = .55;
+    s.style.setProperty('--max-op', opacity);
+    if(d > 7500 && Math.random()<.25){
+      s.style.background = 'var(--bio-purple)';
+      s.style.boxShadow = '0 0 4px var(--bio-purple),0 0 8px var(--bio-purple)';
+    } else if(d > 4000 && d < 7000 && Math.random()<.25){
+      s.style.background = 'var(--bio-green)';
+      s.style.boxShadow = '0 0 5px var(--bio-green),0 0 10px var(--bio-green)';
+    }
+    const dur = 3 + Math.random()*5;
+    const delay = Math.random()*5;
+    s.style.animation = `sparkle ${dur}s ease-in-out ${delay}s infinite`;
+    $scene.appendChild(s);
+  }
+
+  // dark seabed vignette at the very bottom (last 1500m)
+  const seabed = document.createElement('div');
+  seabed.style.cssText = `
+    position:absolute;
+    left:0;right:0;
+    top:${9500*0.8}px;
+    height:${1500*0.8}px;
+    background:linear-gradient(to bottom,transparent 0%,rgba(0,0,0,.5) 40%,#000 100%);
+    pointer-events:none;
+  `;
+  $scene.appendChild(seabed);
+
+  // actual seafloor at the bottom — rocky silhouette
+  const floor = document.createElement('div');
+  floor.style.cssText = `
+    position:absolute;
+    left:0;right:0;
+    top:${11000*0.8 - 60}px;
+    height:120px;
+    pointer-events:none;
+    z-index:2;
+  `;
+  floor.innerHTML = `
+    <svg viewBox="0 0 1000 120" preserveAspectRatio="none" style="width:100%;height:100%;display:block;">
+      <path d="M0 60 L40 50 L80 65 L130 45 L180 70 L230 55 L280 40 L340 60 L400 35 L450 55 L510 30 L570 50 L620 45 L680 25 L730 50 L790 40 L850 60 L910 35 L960 55 L1000 45 L1000 120 L0 120 Z"
+            fill="#000"/>
+      <path d="M0 60 L40 50 L80 65 L130 45 L180 70 L230 55 L280 40 L340 60 L400 35 L450 55 L510 30 L570 50 L620 45 L680 25 L730 50 L790 40 L850 60 L910 35 L960 55 L1000 45"
+            fill="none" stroke="rgba(80,60,90,.4)" stroke-width="1"/>
+    </svg>
+  `;
+  $scene.appendChild(floor);
+
+  // depth ticks every 500m
+  for(let d=500; d<=11000; d+=500){
+    const t = document.createElement('div');
+    t.className = 'depth-tick';
+    t.style.top = (d*0.8) + 'px';
+    t.textContent = d + 'm';
+    $scene.appendChild(t);
+  }
+
+  // ambient creatures in each zone (decorative swimmers)
+  ZONES.forEach(z => {
+    const creaturesInZone = CREATURES.filter(c => c.zone === z.id);
+    // spawn a few per zone as ambient
+    const count = Math.max(2, Math.round((z.max-z.min)/600));
+    for(let i=0;i<count;i++){
+      const c = creaturesInZone[Math.floor(Math.random()*creaturesInZone.length)];
+      if(!c) continue;
+      const el = document.createElement('div');
+      el.className = 'creature ambient';
+      el.dataset.id = c.id;
+      const topM = z.min + 50 + Math.random()*(z.max - z.min - 100);
+      el.style.top = (topM*0.8) + 'px';
+      const flip = Math.random()<.5;
+      const leftPct = Math.random()*80+5;
+      el.style.left = leftPct+'%';
+      el.style.transform = flip?'scaleX(-1)':'';
+      // dimmer the deeper we go
+      let op = 0.85;
+      if(z.id==='hadal') op = 0.35;
+      else if(z.id==='abyss') op = 0.55;
+      else if(z.id==='midnight') op = 0.7;
+      el.style.opacity = op;
+      el.innerHTML = c.svg;
+
+      // add swim animation
+      const dur = 16 + Math.random()*20;
+      const delay = -Math.random()*dur;
+      el.style.animation = `swim${i%2} ${dur}s ease-in-out ${delay}s infinite`;
+
+      $scene.appendChild(el);
+    }
+  });
+}
+
+// inject keyframes for swim + sparkle
+const styleEl = document.createElement('style');
+styleEl.textContent = `
+  @keyframes swim0{
+    0%{transform:translateX(-30px) scaleX(1);}
+    50%{transform:translateX(30px) scaleX(1);}
+    100%{transform:translateX(-30px) scaleX(1);}
+  }
+  @keyframes swim1{
+    0%{transform:translateX(40px) scaleX(-1);}
+    50%{transform:translateX(-40px) scaleX(-1);}
+    100%{transform:translateX(40px) scaleX(-1);}
+  }
+  @keyframes sparkle{
+    0%,100%{opacity:0;}
+    50%{opacity:.9;}
+  }
+`;
+document.head.appendChild(styleEl);
+
+buildScene();
+
+// =================== CAMERA ===================
+function updateCamera(){
+  const oceanH = $ocean.clientHeight;
+  // hook is at 1/3 from top of ocean view
+  const hookScreenY = oceanH * 0.32;
+  // in world coords hook is at depth*0.8 + 24 (line start offset) 
+  const hookWorldY = state.depth * 0.8 + 24;
+  // camera offset: hookWorldY - hookScreenY
+  const offset = -(hookWorldY - hookScreenY);
+  // clamp at top (can't see above surface)
+  const clamped = Math.min(offset, 0);
+  $scene.style.transform = `translateY(${clamped}px)`;
+
+  // line grows from top of ocean down to hook position
+  // when camera offset is clamped at 0 (depth < hookScreenY/0.8)
+  // line length in screen = depth*0.8 + 24
+  if(offset >= 0){
+    // not clamped case
+    $line.style.top = '0px';
+    $line.style.height = (state.depth*0.8 + 24 - 24) + 'px';
+    $hook.style.top = (state.depth*0.8 + 24) + 'px';
+  } else {
+    // camera clamped: hook stays at hookScreenY, line goes from top (minus scroll) to hook
+    // line starts at boat (y = -offset + 24 in screen coordinates if boat is at y=24 in world)
+    const boatScreenY = 24 + offset; // boat in screen after offset
+    const hookScreenPos = hookScreenY;
+    const lineTop = Math.max(0, boatScreenY + 8); // slight offset below boat
+    $line.style.top = lineTop + 'px';
+    $line.style.height = (hookScreenPos - lineTop) + 'px';
+    $hook.style.top = hookScreenY + 'px';
+  }
+}
+updateCamera();
+
+// =================== RENDER STATE ===================
+function updateDepthDisplay(){
+  $depthVal.innerHTML = Math.round(state.depth) + '<span>m</span>';
+  const z = zoneAt(state.depth);
+  $zoneNow.textContent = (state.depth<1?'海面':(z.name+' · '+z.en));
+}
+
+function setStatus(text, hint, side){
+  $statusText.textContent = text;
+  $statusHint.textContent = hint || '';
+  if(side!==undefined) $statusSide.textContent = side;
+}
+
+// =================== GAME LOGIC ===================
+const MAX_DEPTH = 11000;
+let lastFrame = null;
+
+function gameTick(ts){
+  if(lastFrame==null) lastFrame = ts;
+  const dt = Math.min(.05,(ts-lastFrame)/1000);
+  lastFrame = ts;
+
+  if(state.phase==='casting'){
+    // descend: start slow, accelerate, then constant
+    const accel = 60; // m/s^2
+    state.descent = Math.min(state.descent + accel*dt, 380); // max 380 m/s (fast!)
+    state.depth += state.descent * dt;
+    if(state.depth >= MAX_DEPTH){
+      state.depth = MAX_DEPTH;
+      startWaiting();
+    }
+  } else if(state.phase==='reeling-home'){
+    // reel the line back up fast
+    state.depth = Math.max(0, state.depth - 800*dt);
+    if(state.depth<=0){
+      state.depth=0;
+      state.phase='idle';
+      setStatus('仕掛けを投下する準備ができました。','Ready to cast your line.','待機');
+      $actionBtn.textContent='仕掛けを投下';
+      $actionBtn.disabled=false;
+      $actionBtn.classList.remove('btn-reel');
+    }
+  }
+
+  updateDepthDisplay();
+  updateCamera();
+  requestAnimationFrame(gameTick);
+}
+requestAnimationFrame(gameTick);
+
+// phase transitions
+function startCast(){
+  if(state.phase!=='idle') return;
+  state.phase='casting';
+  state.descent=0;
+  state.depth=0;
+  state.casts++;
+  $statCasts.textContent = state.casts;
+  saveState();
+  setStatus('仕掛けが沈んでいく…','Sinking through the blue...','投下中');
+  $actionBtn.textContent='停止して糸を垂らす';
+}
+
+function startWaiting(){
+  state.phase='waiting';
+  state.descent=0;
+  if(state.depth > state.maxDepth){
+    state.maxDepth = Math.round(state.depth);
+    $statMax.innerHTML = state.maxDepth + '<span style="font-size:11px">m</span>';
+    saveState();
+  }
+  setStatus('海中に糸を垂らして待機中…','Waiting for a bite...','待機中');
+  $actionBtn.textContent='糸を引き上げる';
+
+  // schedule a bite
+  scheduleBite();
+}
+
+function scheduleBite(){
+  clearTimeout(state.biteTimer);
+  // delay depends on whether any creature lives at this depth
+  const candidates = CREATURES.filter(c => state.depth >= c.minD && state.depth <= c.maxD);
+  const hasCandidates = candidates.length>0;
+  const minDelay = hasCandidates ? 1500 : 4000;
+  const maxDelay = hasCandidates ? 5000 : 12000;
+  const delay = minDelay + Math.random()*(maxDelay-minDelay);
+  state.biteTimer = setTimeout(()=>{
+    if(state.phase==='waiting') triggerBite();
+  }, delay);
+}
+
+function pickCreature(){
+  const candidates = CREATURES.filter(c => state.depth >= c.minD && state.depth <= c.maxD);
+  if(candidates.length===0) return null;
+  // weighted random by rarity
+  const weights = candidates.map(c => RARITY_WEIGHT[c.rarity] || 1);
+  const sum = weights.reduce((a,b)=>a+b,0);
+  let r = Math.random()*sum;
+  for(let i=0;i<candidates.length;i++){
+    r -= weights[i];
+    if(r<=0) return candidates[i];
+  }
+  return candidates[0];
+}
+
+function triggerBite(){
+  const c = pickCreature();
+  if(!c){
+    // no bite — reschedule as nibble
+    setStatus('何もいないようだ…','Nothing lurks here.','静寂');
+    scheduleBite();
+    return;
+  }
+  state.currentBite = c;
+  state.phase='biting';
+  setStatus('アタリだ！いま引き上げろ！','A bite! Tap now to hook it!','アタリ');
+  $biteRing.classList.add('active');
+
+  // huge visual feedback
+  $biteBanner.classList.remove('show');
+  void $biteBanner.offsetWidth; // restart animation
+  $biteBanner.classList.add('show');
+  $scene.classList.remove('shake');
+  void $scene.offsetWidth;
+  $scene.classList.add('shake');
+  $hook.classList.add('biting');
+  $line.classList.add('biting');
+
+  // Pre-show bars at 0/full so the button doesn't jump when reeling starts
+  $reelBarFill.style.width = '0%';
+  $reelBarLabel.textContent = '巻き上げ 0% / 100%';
+  $timeBarFill.style.width = '100%';
+  $timeBarFill.classList.remove('warn');
+  $reelBarWrap.classList.add('active');
+  $timeBarWrap.classList.add('active');
+
+  // big button pulse
+  $actionBtn.textContent='いま！タップ！';
+  $actionBtn.classList.add('btn-bite');
+
+  // longer reaction window (was 1.8s, now 2.8s)
+  setTimeout(()=>{
+    if(state.phase==='biting'){
+      // if player didn't hook in time, fish escapes
+      $biteRing.classList.remove('active');
+      $hook.classList.remove('biting');
+      $line.classList.remove('biting');
+      $actionBtn.classList.remove('btn-bite');
+      $actionBtn.textContent='糸を引き上げる';
+      $reelBarWrap.classList.remove('active');
+      $timeBarWrap.classList.remove('active');
+      state.currentBite=null;
+      state.phase='waiting';
+      setStatus('逃げられた…もう一度待ってみよう。','It got away. Keep waiting.','待機中');
+      scheduleBite();
+    }
+  }, 2800);
+}
+
+function startReeling(){
+  state.phase='reeling';
+  $biteRing.classList.remove('active');
+  $hook.classList.remove('biting');
+  $line.classList.remove('biting');
+  $actionBtn.classList.remove('btn-bite');
+  state.reelProgress = 1; // first tap counts
+  // time limit depends on rarity
+  const r = state.currentBite.rarity;
+  const baseLimit = {common:8000,uncommon:9000,rare:11000,legendary:13000,mythical:16000}[r];
+  state.reelTimeLimit = baseLimit;
+  state.reelStartTime = Date.now();
+  const need = {common:7,uncommon:10,rare:14,legendary:20,mythical:28}[r];
+  state.reelTarget = need;
+
+  setStatus('連打で巻き上げろ！ゲージ満タンで捕獲！','Tap rapidly! Fill the gauge to catch!','格闘中');
+  $actionBtn.textContent='タップ！巻き上げ！';
+  $actionBtn.classList.add('btn-reel');
+  // bars are already shown from triggerBite — just update them
+  updateReelBar();
+  updateTimeBar();
+
+  // gentler decay — was .3 every 150ms, now .2 every 200ms
+  state.reelDecayTimer = setInterval(()=>{
+    if(state.phase!=='reeling') return;
+    state.reelProgress = Math.max(0, state.reelProgress - .2);
+    updateReelBar();
+  },200);
+
+  // time bar update (visible countdown)
+  state.reelTimerCountdown = setInterval(()=>{
+    if(state.phase!=='reeling') return;
+    const elapsed = Date.now()-state.reelStartTime;
+    updateTimeBar();
+    if(elapsed >= state.reelTimeLimit){
+      escape();
+    }
+  }, 50);
+}
+
+function updateTimeBar(){
+  const elapsed = Date.now()-state.reelStartTime;
+  const pct = Math.max(0,100 - (elapsed/state.reelTimeLimit)*100);
+  $timeBarFill.style.width = pct+'%';
+  if(pct < 30) $timeBarFill.classList.add('warn');
+  else $timeBarFill.classList.remove('warn');
+}
+
+function updateReelBar(){
+  const pct = Math.min(100, (state.reelProgress / state.reelTarget)*100);
+  $reelBarFill.style.width = pct+'%';
+  $reelBarLabel.textContent = `巻き上げ ${Math.round(pct)}% / 100%`;
+  if(pct >= 100) catchIt();
+}
+
+function spawnTapFloat(text){
+  const el = document.createElement('div');
+  el.className = 'tap-float';
+  el.textContent = text;
+  // spawn at a spot near the action button
+  const btnRect = $actionBtn.getBoundingClientRect();
+  el.style.left = (btnRect.left + btnRect.width/2 + (Math.random()-.5)*60) + 'px';
+  el.style.top = (btnRect.top + 4) + 'px';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 700);
+}
+
+function flashReelBar(){
+  $reelBarFill.classList.remove('bump');
+  void $reelBarFill.offsetWidth;
+  $reelBarFill.classList.add('bump');
+}
+
+function flashButton(){
+  $actionBtn.classList.remove('tap-flash');
+  void $actionBtn.offsetWidth;
+  $actionBtn.classList.add('tap-flash');
+}
+
+function catchIt(){
+  if(state.phase!=='reeling') return;
+  clearInterval(state.reelDecayTimer);
+  clearInterval(state.reelTimerCountdown);
+  state.phase='caught';
+  $actionBtn.classList.remove('btn-reel');
+  $reelBarWrap.classList.remove('active');
+  $timeBarWrap.classList.remove('active');
+  $timeBarFill.classList.remove('warn');
+
+  const c = state.currentBite;
+  state.collection[c.id] = (state.collection[c.id]||0)+1;
+
+  $statTotal.textContent = Object.keys(state.collection).length;
+  saveState();
+
+  showCatchPopup(c);
+}
+
+function escape(){
+  clearInterval(state.reelDecayTimer);
+  clearInterval(state.reelTimerCountdown);
+  state.phase='escaped';
+  $actionBtn.classList.remove('btn-reel');
+  $reelBarWrap.classList.remove('active');
+  $timeBarWrap.classList.remove('active');
+  $timeBarFill.classList.remove('warn');
+  state.currentBite=null;
+  $('escape-popup').classList.add('open');
+}
+
+function showCatchPopup(c){
+  $('cp-art').innerHTML = c.svg;
+  $('cp-name').textContent = c.name;
+  $('cp-sci').textContent = c.sci;
+  $('cp-desc').textContent = c.desc;
+  $('cp-depth').textContent = Math.round(state.depth)+'m';
+  $('cp-rarity').textContent = RARITY_LABEL[c.rarity];
+  const popup = $('catch-popup');
+  popup.classList.add('open');
+}
+
+function reelHome(){
+  state.phase='reeling-home';
+  setStatus('糸を巻き戻している…','Reeling the line back up...','巻き戻し');
+  $actionBtn.disabled=true;
+  $actionBtn.textContent='巻き戻し中…';
+}
+
+// =================== INPUT ===================
+$actionBtn.addEventListener('click',()=>{
+  if(state.phase==='idle'){
+    startCast();
+  } else if(state.phase==='casting'){
+    startWaiting();
+  } else if(state.phase==='waiting'){
+    clearTimeout(state.biteTimer);
+    reelHome();
+  } else if(state.phase==='biting'){
+    // first tap hooks AND counts as first reel action
+    startReeling();
+    flashReelBar();
+    spawnTapFloat('+1');
+  } else if(state.phase==='reeling'){
+    state.reelProgress += 1;
+    updateReelBar();
+    flashReelBar();
+    flashButton();
+    spawnTapFloat('+1');
+  }
+});
+
+// Also allow tap anywhere on ocean for the same action
+$ocean.addEventListener('click',(e)=>{
+  // Prevent double trigger from button
+  if(e.target.closest('#depth-hud')) return;
+  $actionBtn.click();
+});
+
+// catch popup
+$('cp-close').addEventListener('click',()=>{
+  $('catch-popup').classList.remove('open');
+  reelHome();
+});
+$('ep-close').addEventListener('click',()=>{
+  $('escape-popup').classList.remove('open');
+  reelHome();
+});
+
+// catalog
+$('open-catalog').addEventListener('click', openCatalog);
+$('catalog-close').addEventListener('click',()=>$('catalog').classList.remove('open'));
+
+function openCatalog(){
+  const body = $('catalog-body');
+  body.innerHTML='';
+  ZONES.forEach(z=>{
+    const group = document.createElement('div');
+    group.className='zone-group';
+    group.innerHTML = `<h3><span>${z.name} · ${z.en}</span><span class="depth-range">${z.min}–${z.max}m</span></h3>`;
+    const grid = document.createElement('div');
+    grid.className='creatures-grid';
+    CREATURES.filter(c=>c.zone===z.id)
+      .slice()
+      .sort((a,b)=>RARITY_RANK[a.rarity]-RARITY_RANK[b.rarity])
+      .forEach(c=>{
+      const found = state.collection[c.id]||0;
+      const card = document.createElement('div');
+      card.className = 'cre-card' + (found?'':' undiscovered');
+      card.innerHTML = `
+        <div class="art">${found?c.svg:'<svg viewBox="0 0 100 60" width="80" height="50"><text x="50" y="40" text-anchor="middle" font-size="30" fill="currentColor" opacity=".3">?</text></svg>'}</div>
+        <div class="name">${found?c.name:'未発見'}</div>
+        <div class="rarity rarity-${c.rarity}">${RARITY_LABEL[c.rarity]}</div>
+        <div class="count">${found?('×'+found):'— — —'}</div>`;
+      grid.appendChild(card);
+    });
+    group.appendChild(grid);
+    body.appendChild(group);
+  });
+
+  // data management section (export / import / reset)
+  const resetWrap = document.createElement('div');
+  resetWrap.style.cssText = 'margin-top:20px;padding-top:16px;border-top:1px dashed rgba(74,56,40,.3);';
+  resetWrap.innerHTML = `
+    <div style="text-align:center;margin-bottom:18px;">
+      <div style="font-family:'Shippori Mincho',serif;font-size:11px;letter-spacing:.3em;color:var(--ink-soft);margin-bottom:12px;">航海記録の管理</div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+        <button id="export-btn" style="
+          background:transparent;
+          color:var(--ink-soft);
+          border:1px solid var(--ink-soft);
+          padding:8px 16px;
+          font-family:'Shippori Mincho',serif;
+          font-size:11px;
+          letter-spacing:.2em;
+          cursor:pointer;
+        ">書き出す</button>
+        <button id="import-btn" style="
+          background:transparent;
+          color:var(--ink-soft);
+          border:1px solid var(--ink-soft);
+          padding:8px 16px;
+          font-family:'Shippori Mincho',serif;
+          font-size:11px;
+          letter-spacing:.2em;
+          cursor:pointer;
+        ">読み込む</button>
+      </div>
+      <div style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:11px;color:var(--ink-soft);margin-top:8px;">
+        Export or import your logbook
+      </div>
+      <input type="file" id="import-file-input" accept=".json,application/json" style="display:none;">
+    </div>
+    <div style="text-align:center;padding-top:14px;border-top:1px dashed rgba(74,56,40,.2);">
+      <button id="reset-btn" style="
+        background:transparent;
+        color:#8b3a1f;
+        border:1px solid #8b3a1f;
+        padding:8px 18px;
+        font-family:'Shippori Mincho',serif;
+        font-size:11px;
+        letter-spacing:.3em;
+        cursor:pointer;
+      ">記録をすべて消去</button>
+      <div style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:11px;color:var(--ink-soft);margin-top:6px;">
+        Erase all records and start anew
+      </div>
+    </div>
+  `;
+  body.appendChild(resetWrap);
+
+  // EXPORT
+  document.getElementById('export-btn').addEventListener('click',()=>{
+    const data = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      casts: state.casts,
+      maxDepth: state.maxDepth,
+      collection: state.collection
+    };
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const date = new Date().toISOString().slice(0,10);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `deep_sea_log_${date}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 500);
+  });
+
+  // IMPORT
+  const fileInput = document.getElementById('import-file-input');
+  document.getElementById('import-btn').addEventListener('click',()=>{
+    fileInput.value = ''; // reset so same file can be re-selected
+    fileInput.click();
+  });
+  fileInput.addEventListener('change',(e)=>{
+    const file = e.target.files && e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      try{
+        const data = JSON.parse(ev.target.result);
+        // validation
+        if(typeof data !== 'object' || data === null) throw new Error('形式が正しくありません');
+        if(typeof data.casts !== 'number' || typeof data.maxDepth !== 'number' || typeof data.collection !== 'object'){
+          throw new Error('セーブデータの構造が認識できません');
+        }
+        // sanity-check collection entries
+        const validIds = new Set(CREATURES.map(c=>c.id));
+        const cleanCollection = {};
+        for(const id in data.collection){
+          if(validIds.has(id) && typeof data.collection[id] === 'number'){
+            cleanCollection[id] = data.collection[id];
+          }
+        }
+        const importedSpecies = Object.keys(cleanCollection).length;
+        const msg = `読み込みプレビュー\n\n` +
+          `投下回数: ${data.casts}\n` +
+          `最深到達: ${data.maxDepth}m\n` +
+          `捕獲種数: ${importedSpecies}種\n\n` +
+          `現在の記録は上書きされます。続行しますか？`;
+        if(confirm(msg)){
+          state.casts = Math.max(0, Math.floor(data.casts));
+          state.maxDepth = Math.max(0, Math.floor(data.maxDepth));
+          state.collection = cleanCollection;
+          saveState();
+          // refresh UI
+          $statTotal.textContent = Object.keys(state.collection).length;
+          $statMax.innerHTML = state.maxDepth + '<span style="font-size:11px">m</span>';
+          $statCasts.textContent = state.casts;
+          $('catalog').classList.remove('open');
+          setStatus('航海記録を読み込みました。','Logbook restored.','読込完了');
+        }
+      }catch(err){
+        alert('読み込みに失敗しました：\n' + (err.message || err));
+      }
+    };
+    reader.onerror = ()=>{
+      alert('ファイルの読み取りに失敗しました。');
+    };
+    reader.readAsText(file);
+  });
+
+  document.getElementById('reset-btn').addEventListener('click',()=>{
+    if(confirm('すべての記録（捕獲種・最深記録・投下回数）を消去します。よろしいですか？')){
+      clearSavedState();
+      state.collection = {};
+      state.maxDepth = 0;
+      state.casts = 0;
+      $statTotal.textContent = '0';
+      $statMax.innerHTML = '0<span style="font-size:11px">m</span>';
+      $statCasts.textContent = '0';
+      $('catalog').classList.remove('open');
+    }
+  });
+  $('catalog').classList.add('open');
+}
+
+// initial
+loadState();
+$statTotal.textContent = Object.keys(state.collection).length;
+$statMax.innerHTML = state.maxDepth + '<span style="font-size:11px">m</span>';
+$statCasts.textContent = state.casts;
+setStatus('仕掛けを投下する準備ができました。','Ready to cast your line.','待機');
+</script>
+</body>
+</html>
